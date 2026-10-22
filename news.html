@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News &amp; Events — Tinubu Progressive Advocates</title>
+  <meta name="description" content="Latest news, announcements, and events from Tinubu Progressive Advocates.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="news">
+
+  <header class="site-header">
+    <div class="container nav-inner">
+      <a href="index.html" class="brand">
+        <img src="logo.png" alt="TPA logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">TINUBU PROGRESSIVE ADVOCATES</span>
+          <span class="brand-sub">National Advocacy &amp; Grassroots Mobilisation</span>
+        </div>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="about.html" data-nav="about">About Us</a>
+        <a href="news.html" data-nav="news">News &amp; Events</a>
+        <a href="executives.html" data-nav="executives">Executives</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow on-navy">STAY INFORMED</p>
+      <h1>News &amp; Events</h1>
+      <p>The latest announcements, press releases, and updates from Tinubu Progressive Advocates.</p>
+    </div>
+  </section>
+
+  <section class="section">
+  <div class="container">
+    <div id="newsListView">
+      <div class="news-grid" id="newsList">
+        <p class="empty-state">Loading…</p>
+      </div>
+    </div>
+    <article id="articleView" class="article-full" hidden></article>
+  </div>
+</section>
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="logo.png" alt="TPA logo" class="footer-logo">
+          <span class="footer-title">TINUBU PROGRESSIVE ADVOCATES</span>
+        </div>
+        <div class="footer-address">
+          <i class="fa-solid fa-location-dot"></i>
+          <span>National Headquarters: Federal Capital Territory, Abuja, Nigeria</span>
+        </div>
+        <div class="footer-social">
+          <a href="mailto:tinubuprogressiveadvocates@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+          <a href="https://x.com/OFFICIAL_TPADVO" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="https://www.facebook.com/profile.php?id=61595682899896" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Tinubu Progressive Advocates. All rights reserved.</p>
+        <a href="admin.html" class="admin-link">Admin Panel</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>

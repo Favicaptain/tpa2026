@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — Tinubu Progressive Advocates</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="admin">
+
+  <header class="site-header">
+    <div class="container nav-inner">
+      <a href="index.html" class="brand">
+        <img src="logo.png" alt="TPA logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">TINUBU PROGRESSIVE ADVOCATES</span>
+          <span class="brand-sub">National Advocacy &amp; Grassroots Mobilisation</span>
+        </div>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="about.html" data-nav="about">About Us</a>
+        <a href="news.html" data-nav="news">News &amp; Events</a>
+        <a href="executives.html" data-nav="executives">Executives</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Sign-in gate -->
+  <section class="admin-gate" id="adminGate">
+    <div class="container">
+      <div class="gate-card">
+        <h1>Content Manager</h1>
+        <p>Sign in with your administrator credentials to manage the site.</p>
+        <form class="stack-form" id="gateForm" onsubmit="return false;">
+          <label>Email
+            <input type="email" id="gateEmail" autocomplete="username" required>
+          </label>
+          <label>Password
+            <input type="password" id="gatePassword" autocomplete="current-password" required>
+          </label>
+          <p class="form-error" id="gateError" hidden></p>
+          <button type="button" class="btn btn-green btn-block" id="gateSignIn">Sign In</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- Access denied -->
+  <section class="admin-denied" id="adminDenied" hidden>
+    <div class="container">
+      <div class="gate-card">
+        <h2>Access Denied</h2>
+        <p>You are signed in as <strong id="deniedEmail"></strong>, but this account does not have administrator privileges.</p>
+        <button type="button" class="btn btn-outline-navy" id="deniedSignOut">Sign Out</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel -->
+  <section class="admin-shell" id="adminPanel" hidden>
+    <div class="container">
+      <div class="admin-header">
+        <div>
+          <h1 class="admin-title">Content Manager</h1>
+          <p class="admin-signedin">Signed in as <strong id="panelEmail"></strong></p>
+        </div>
+        <button type="button" class="btn btn-outline-navy" id="panelSignOut">Sign Out</button>
+      </div>
+
+      <div class="admin-tabs" role="tablist">
+        <button class="admin-tab active" data-tab="news" role="tab" aria-selected="true">News</button>
+        <button class="admin-tab" data-tab="execos" role="tab" aria-selected="false">National Excos</button>
+        <button class="admin-tab" data-tab="bot" role="tab" aria-selected="false">Board of Trustees</button>
+        <button class="admin-tab" data-tab="coordinators" role="tab" aria-selected="false">State Coordinators</button>
+        <button class="admin-tab" data-tab="members" role="tab" aria-selected="false">Members</button>
+      </div>
+
+      <!-- NEWS -->
+      <div class="admin-tab-panel" id="tabNews">
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Publish / Edit Article</h3>
+            <form class="stack-form" id="newsForm" novalidate>
+              <input type="hidden" id="newsEditId">
+              <label>Headline
+                <input type="text" id="newsTitle" required>
+              </label>
+              <div class="form-row">
+                <label>Date
+                  <input type="date" id="newsDate" required>
+                </label>
+                <label>Category
+                  <select id="newsCategory" required>
+                    <option value="Announcement">Announcement</option>
+                    <option value="News">News</option>
+                    <option value="Event">Event</option>
+                    <option value="Press Release">Press Release</option>
+                  </select>
+                </label>
+              </div>
+              <label>Short Summary (max 220 chars)
+                <textarea id="newsSnippet" rows="2" maxlength="220" required></textarea>
+              </label>
+              <label>Full Article
+                <textarea id="newsBody" rows="9" required></textarea>
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="newsSubmit">Publish Article</button>
+                <button type="button" class="btn btn-ghost" id="newsCancel" hidden>Cancel Edit</button>
+                <button type="button" class="btn btn-ghost" id="newsClear">Clear</button>
+              </div>
+              <p class="form-success" id="newsSuccess" hidden></p>
+              <p class="form-error" id="newsError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Articles</h3>
+            <div class="admin-list" id="adminNewsList">
+              <p class="empty-state">Loading…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXECOS -->
+      <div class="admin-tab-panel" id="tabExecos" hidden>
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Add / Edit Executive</h3>
+            <form class="stack-form" id="execoForm" novalidate>
+              <input type="hidden" id="execoEditId">
+              <label>Full Name
+                <input type="text" id="execoName" required>
+              </label>
+              <label>Post Held
+                <input type="text" id="execoRole" required>
+              </label>
+              <label>Display Order
+                <input type="number" id="execoOrder" value="0" step="1">
+              </label>
+              <label>Upload Photo (≤ 500 KB recommended)
+                <input type="file" id="execoPhoto" accept="image/*">
+              </label>
+              <label>…or paste an Image URL
+                <input type="url" id="execoPhotoUrl" placeholder="https://…">
+              </label>
+              <div class="preview-wrap" id="execoPreviewWrap" hidden>
+                <img id="execoPreview" alt="">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="execoSubmit">Add Executive</button>
+                <button type="button" class="btn btn-ghost" id="execoCancel" hidden>Cancel Edit</button>
+              </div>
+              <p class="form-success" id="execoSuccess" hidden></p>
+              <p class="form-error" id="execoError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Current Executives</h3>
+            <div class="admin-list" id="adminExecoList">
+              <p class="empty-state">Loading…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOT -->
+      <div class="admin-tab-panel" id="tabBot" hidden>
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Add / Edit Trustee</h3>
+            <form class="stack-form" id="botForm" novalidate>
+              <input type="hidden" id="botEditId">
+              <label>Full Name
+                <input type="text" id="botName" required>
+              </label>
+              <label>Position
+                <input type="text" id="botRole" required>
+              </label>
+              <label>Display Order
+                <input type="number" id="botOrder" value="0" step="1">
+              </label>
+              <label>Upload Photo (≤ 500 KB recommended)
+                <input type="file" id="botPhoto" accept="image/*">
+              </label>
+              <label>…or paste an Image URL
+                <input type="url" id="botPhotoUrl" placeholder="https://…">
+              </label>
+              <div class="preview-wrap" id="botPreviewWrap" hidden>
+                <img id="botPreview" alt="">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="botSubmit">Add Trustee</button>
+                <button type="button" class="btn btn-ghost" id="botCancel" hidden>Cancel Edit</button>
+              </div>
+              <p class="form-success" id="botSuccess" hidden></p>
+              <p class="form-error" id="botError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Current Board Members</h3>
+            <div class="admin-list" id="adminBotList">
+              <p class="empty-state">Loading…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COORDINATORS -->
+      <div class="admin-tab-panel" id="tabCoordinators" hidden>
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Add Coordinator</h3>
+            <form class="stack-form" id="coordForm" novalidate>
+              <label>Full Name
+                <input type="text" id="coordName" required>
+              </label>
+              <label>State
+                <select id="coordState" required></select>
+              </label>
+              <label>Local Government Area
+                <input type="text" id="coordLga" required>
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="coordSubmit">Add Coordinator</button>
+                <button type="button" class="btn btn-outline-navy" id="coordSeed">Import Default Coordinators</button>
+              </div>
+              <p class="form-success" id="coordSuccess" hidden></p>
+              <p class="form-error" id="coordError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Current Coordinators</h3>
+            <div class="admin-list" id="adminCoordList">
+              <p class="empty-state">Loading…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEMBERS -->
+      <div class="admin-tab-panel" id="tabMembers" hidden>
+        <div class="admin-card">
+          <h3>Membership Registrations (<span id="membersCount">0</span>)</h3>
+          <div class="admin-members-toolbar">
+            <div class="search-wrap">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input id="membersSearch" type="search" placeholder="Search by name, email or state…">
+            </div>
+            <button type="button" class="btn btn-outline-navy btn-small" id="membersDownloadCsv">
+              <i class="fa-solid fa-file-csv"></i>&nbsp;Download CSV
+            </button>
+          </div>
+          <div class="admin-list" id="adminMembersList">
+            <p class="empty-state">Loading…</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="logo.png" alt="TPA logo" class="footer-logo">
+          <span class="footer-title">TINUBU PROGRESSIVE ADVOCATES</span>
+        </div>
+        <div class="footer-address">
+          <i class="fa-solid fa-location-dot"></i>
+          <span>National Headquarters: Federal Capital Territory, Abuja, Nigeria</span>
+        </div>
+        <div class="footer-social">
+          <a href="mailto:tinubuprogressiveadvocates@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+          <a href="https://x.com/OFFICIAL_TPADVO" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="https://www.facebook.com/profile.php?id=61595682899896" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Tinubu Progressive Advocates. All rights reserved.</p>
+        <a href="admin.html" class="admin-link">Admin Panel</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>

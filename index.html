@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tinubu Progressive Advocates — United for Progress</title>
+  <meta name="description" content="Tinubu Progressive Advocates (TPA) — grassroots advocacy, youth development through football, and national integration. Home of the Five Million Footballs initiative.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="home">
+
+  <header class="site-header">
+    <div class="container nav-inner">
+      <a href="index.html" class="brand">
+        <img src="logo.png" alt="TPA logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">TINUBU PROGRESSIVE ADVOCATES</span>
+          <span class="brand-sub">National Advocacy &amp; Grassroots Mobilisation</span>
+        </div>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="about.html" data-nav="about">About Us</a>
+        <a href="news.html" data-nav="news">News &amp; Events</a>
+        <a href="executives.html" data-nav="executives">Executives</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <p class="eyebrow gold">UNITY . PROGRESS . SERVICE</p>
+      <h1>United for Progress. Connected to the People.</h1>
+      <p class="hero-lead">Welcome to Tinubu Progressive Advocates (TPA). Learn about our organisation, meet our leadership, explore our activities and connect with your state chapter.</p>
+      <div class="hero-actions">
+        <a href="#membership" class="btn btn-green">Join the Movement</a>
+        <a href="about.html" class="btn btn-outline-light">Discover TPA</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature-section">
+    <div class="container">
+      <div class="feature-card">
+        <h2>Flagship Initiative: Five Million Footballs</h2>
+        <p>We are on a mission to distribute five million footballs across all 36 states and the FCT. This initiative goes beyond sport—it is a strategic tool for youth engagement, grassroots talent discovery, and national unity.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container two-col">
+      <div class="fade-up">
+        <p class="eyebrow">WHO WE ARE</p>
+        <h2>About the Organisation</h2>
+        <p>Tinubu Progressive Advocates is a national grassroots movement committed to advancing progressive leadership, empowering young Nigerians, and strengthening the bonds that unite us as one people.</p>
+        <p>Through sport, civic education and community mobilisation, we work state by state, ward by ward, to ensure every Nigerian has a seat at the table and a voice in shaping our shared future.</p>
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-number">5M</span>
+            <span class="stat-label">Football Target</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-number">36+1</span>
+            <span class="stat-label">States &amp; FCT</span>
+          </div>
+        </div>
+      </div>
+      <div class="pillars fade-up">
+        <article class="pillar-card">
+          <span class="pillar-icon"><i class="fa-solid fa-eye"></i></span>
+          <h3>Vision</h3>
+          <p>A united, empowered and prosperous Nigeria where every young person can participate and reach their potential.</p>
+          <a href="about.html#vision" class="link-more">Read More →</a>
+        </article>
+        <article class="pillar-card">
+          <span class="pillar-icon"><i class="fa-solid fa-bullseye"></i></span>
+          <h3>Mission</h3>
+          <p>To distribute five million footballs across Nigeria and use sport to expand opportunity and unity.</p>
+          <a href="about.html#mission" class="link-more">Read More →</a>
+        </article>
+        <article class="pillar-card">
+          <span class="pillar-icon"><i class="fa-solid fa-landmark"></i></span>
+          <h3>Mandate</h3>
+          <p>To convert grassroots football access into a national movement for empowerment and integration.</p>
+          <a href="about.html#mandate" class="link-more">Read More →</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-grey">
+    <div class="container">
+      <div class="section-head split">
+        <div>
+          <p class="eyebrow">STAY INFORMED</p>
+          <h2>News &amp; Announcements</h2>
+        </div>
+        <a href="news.html" class="link-more">View all news →</a>
+      </div>
+      <div class="news-grid" id="featuredNewsContainer">
+        <p class="empty-state">Loading…</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="membership">
+    <div class="container">
+      <div class="section-head" style="margin-left:auto;margin-right:auto;text-align:center;">
+        <p class="eyebrow">JOIN THE MOVEMENT</p>
+        <h2>Membership Registration</h2>
+      </div>
+      <div class="membership-card">
+        <form id="membershipForm" class="stack-form" novalidate>
+          <label>Full Name
+            <input type="text" name="fullName" required>
+          </label>
+          <label>Email
+            <input type="email" name="email" required>
+          </label>
+          <label>Phone
+            <input type="tel" name="phone" required>
+          </label>
+          <label>State of Residence
+            <select name="state" id="memberState" required></select>
+          </label>
+          <button type="submit" class="btn btn-green btn-block">Submit Registration</button>
+          <p class="form-note">Your registration will be confirmed by your State Coordinator.</p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="logo.png" alt="TPA logo" class="footer-logo">
+          <span class="footer-title">TINUBU PROGRESSIVE ADVOCATES</span>
+        </div>
+        <div class="footer-address">
+          <i class="fa-solid fa-location-dot"></i>
+          <span>National Headquarters: Federal Capital Territory, Abuja, Nigeria</span>
+        </div>
+        <div class="footer-social">
+          <a href="mailto:tinubuprogressiveadvocates@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+          <a href="https://x.com/OFFICIAL_TPADVO" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="https://www.facebook.com/profile.php?id=61595682899896" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 Tinubu Progressive Advocates. All rights reserved.</p>
+        <a href="admin.html" class="admin-link">Admin Panel</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
