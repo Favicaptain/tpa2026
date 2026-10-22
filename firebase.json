@@ -6,15 +6,11 @@
       "**/.*",
       "**/node_modules/**",
       "README.md",
-      "firestore.rules",
-      "storage.rules"
+      "firestore.rules"
     ],
     "cleanUrls": true
   },
   "firestore": {
     "rules": "firestore.rules"
-  },
-  "storage": {
-    "rules": "storage.rules"
   }
 }

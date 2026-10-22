@@ -1,9 +1,7 @@
 /* =========================================================
    TPA — page controller
-   Self-executing module. Reads document.body.dataset.page
-   and initialises the right renderer.
-   Media uploads go to Cloudinary (unsigned preset); all
-   other data persists in Firebase Firestore.
+   Reads document.body.dataset.page and initialises the right renderer.
+   Media uploads go to Cloudinary (unsigned preset); other data to Firestore.
    ========================================================= */
 
 import { auth } from './firebase-config.js';
@@ -17,6 +15,7 @@ import { DEFAULT_COORDINATORS } from './seed-data.js';
 
 const NIGERIAN_STATES = data.NIGERIAN_STATES;
 const page = document.body.dataset.page;
+const ORIGINAL_TITLE = document.title;
 
 /* ---------------------------------------------------------
    Utilities
@@ -32,13 +31,25 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function tsToDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'object' && typeof v.toDate === 'function') {
+    try { return v.toDate(); } catch { return null; }
+  }
+  if (typeof v === 'number') return new Date(v);
+  if (typeof v === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(v + 'T00:00:00');
+    return new Date(v);
+  }
+  return null;
+}
+
 function formatDate(str) {
   if (!str) return '';
-  const d = new Date(str + 'T00:00:00');
-  if (isNaN(d.getTime())) return str;
-  return d.toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric'
-  });
+  const d = tsToDate(str);
+  if (!d || isNaN(d.getTime())) return typeof str === 'string' ? str : '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function todayISO() {
@@ -77,22 +88,17 @@ function friendlyAuthError(err) {
   }
 }
 
-/* ---------- CSV export helpers ---------- */
+/* ---------- CSV ---------- */
 
 function csvEscape(value) {
   const s = String(value == null ? '' : value);
-  if (/[",\n\r]/.test(s)) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
 
 function downloadCSV(filename, headers, rows) {
   const lines = [headers.map(csvEscape).join(',')];
-  for (const row of rows) {
-    lines.push(row.map(csvEscape).join(','));
-  }
-  // BOM (\uFEFF) so Excel opens UTF-8 (Nigerian names) correctly
+  for (const row of rows) lines.push(row.map(csvEscape).join(','));
   const csv = '\uFEFF' + lines.join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -133,23 +139,17 @@ function initNav() {
   const toggle = document.getElementById('menuToggle');
   const links = document.getElementById('navLinks');
   if (!toggle || !links) return;
-
-  toggle.addEventListener('click', () => {
-    links.classList.toggle('open');
-  });
-
+  toggle.addEventListener('click', () => links.classList.toggle('open'));
   links.querySelectorAll('a').forEach((a) => {
     if (a.dataset.nav === page) a.classList.add('active');
     a.addEventListener('click', () => links.classList.remove('open'));
   });
 }
 
-function initAnimations() {
-  observeFadeUps(document);
-}
+function initAnimations() { observeFadeUps(document); }
 
 /* ---------------------------------------------------------
-   Home — featured news (latest 3)
+   Home — featured news
    --------------------------------------------------------- */
 
 async function renderHomeNews() {
@@ -184,7 +184,7 @@ function newsCardHtml(a) {
 }
 
 /* ---------------------------------------------------------
-   News page — list mode + single-article mode
+   News page
    --------------------------------------------------------- */
 
 async function renderNewsPage() {
@@ -196,7 +196,6 @@ async function renderNewsPage() {
   const params = new URLSearchParams(window.location.search);
   const articleId = params.get('id');
 
-  /* ---- Single-article mode (news.html?id=xyz) ---- */
   if (articleId) {
     listView.hidden = true;
     articleView.hidden = false;
@@ -214,9 +213,9 @@ async function renderNewsPage() {
     return;
   }
 
-  /* ---- List mode (news.html) ---- */
   listView.hidden = false;
   articleView.hidden = true;
+  document.title = ORIGINAL_TITLE;
   list.innerHTML = '<p class="empty-state">Loading…</p>';
 
   let articles = [];
@@ -227,12 +226,10 @@ async function renderNewsPage() {
     list.innerHTML = '<p class="empty-state">Could not load news. Please try again later.</p>';
     return;
   }
-
   if (!articles.length) {
     list.innerHTML = '<p class="empty-state">No news articles have been published yet.</p>';
     return;
   }
-
   list.innerHTML = articles.map(a => `
     <article class="news-card fade-up">
       <div class="news-meta">
@@ -256,11 +253,8 @@ function renderArticleView(container, article) {
     return;
   }
   const paragraphs = (article.body || '')
-    .split(/\n{2,}/)
-    .map(p => p.trim())
-    .filter(Boolean)
-    .map(p => `<p>${escapeHtml(p)}</p>`)
-    .join('');
+    .split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+    .map(p => `<p>${escapeHtml(p)}</p>`).join('');
   document.title = `${article.title} — Tinubu Progressive Advocates`;
   container.innerHTML = `
     <a href="news.html" class="article-back">← Back to all news</a>
@@ -276,6 +270,80 @@ function renderArticleView(container, article) {
 /* ---------------------------------------------------------
    Executives page
    --------------------------------------------------------- */
+
+/**
+ * Overlay a leadership slot with data from Firestore.
+ * Falls back to whatever is hardcoded in the HTML if nothing
+ * exists in Firestore yet — so the page is never blank.
+ */
+async function renderLeadership() {
+  const slots = [
+    {
+      key: 'national_leader',
+      nameId: 'nationalLeaderName',
+      roleId: 'nationalLeaderRole',
+      imgId: 'nationalLeaderPhoto',
+      fallbackId: 'nationalLeaderPhotoFallback'
+    },
+    {
+      key: 'custodian',
+      nameId: 'custodianName',
+      roleId: 'custodianRole',
+      imgId: 'custodianPhoto',
+      fallbackId: 'custodianPhotoFallback'
+    }
+  ];
+
+  for (const slot of slots) {
+    const nameEl = document.getElementById(slot.nameId);
+    const roleEl = document.getElementById(slot.roleId);
+    const imgEl  = document.getElementById(slot.imgId);
+    const fallbackEl = document.getElementById(slot.fallbackId);
+    if (!nameEl || !imgEl) continue;
+
+    try {
+      const info = await data.fetchLeadership(slot.key);
+      if (!info) continue;   // no Firestore doc → keep the hardcoded defaults
+
+      if (info.name) nameEl.textContent = info.name;
+      if (info.role && roleEl) roleEl.textContent = info.role;
+
+      if (info.photoUrl) {
+        imgEl.src = info.photoUrl;
+        imgEl.hidden = false;
+        if (fallbackEl) fallbackEl.hidden = true;
+      } else {
+        imgEl.hidden = true;
+        imgEl.removeAttribute('src');
+        if (fallbackEl) {
+          fallbackEl.hidden = false;
+          if (info.name) fallbackEl.textContent = getInitials(info.name);
+        }
+      }
+    } catch (err) {
+      console.error('Could not load leadership slot', slot.key, err);
+      /* Silently keep the hardcoded defaults */
+    }
+  }
+}
+
+async function renderPatrons() {
+  const grid = document.getElementById('patronsGrid');
+  if (!grid) return;
+  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    const list = await data.fetchPatrons();
+    if (!list.length) {
+      grid.innerHTML = '<p class="empty-state">Patron profiles will appear here once published.</p>';
+      return;
+    }
+    grid.innerHTML = list.map(cardHtmlForPerson).join('');
+    observeFadeUps(grid);
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<p class="empty-state">Could not load patrons.</p>';
+  }
+}
 
 async function renderExecutives() {
   const grid = document.getElementById('execGrid');
@@ -332,20 +400,19 @@ async function renderCoordinators() {
   const search = document.getElementById('coordSearch');
   if (!grid) return;
 
+  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  if (empty) empty.hidden = true;
+
   let coords = [];
   try {
     coords = await data.fetchStateCoordinators();
   } catch (err) {
     console.error(err);
     grid.innerHTML = '';
-    if (empty) {
-      empty.hidden = false;
-      empty.textContent = 'Could not load coordinators.';
-    }
+    if (empty) { empty.hidden = false; empty.textContent = 'Could not load coordinators.'; }
     return;
   }
 
-  /* Inline SVG icons — no external dependency */
   const svgPin = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
   const svgMap = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`;
 
@@ -380,36 +447,32 @@ async function renderCoordinators() {
     if (animate) observeFadeUps(grid);
   }
 
-  renderCards(coords, true);   // initial load → animate in
+  renderCards(coords, true);
 
   if (search) {
     search.addEventListener('input', () => {
       const q = search.value.trim().toLowerCase();
-      if (!q) {
-        renderCards(coords, false);
-        return;
-      }
+      if (!q) { renderCards(coords, false); return; }
       const filtered = coords.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.state.toLowerCase().includes(q) ||
         c.lga.toLowerCase().includes(q)
       );
-      renderCards(filtered, false);   // search → no animation, instant
+      renderCards(filtered, false);
     });
   }
 }
 
 /* ---------------------------------------------------------
-   Membership form (home page)
-   Writes to Firestore `members` collection.
+   Membership form
    --------------------------------------------------------- */
 
 async function initMembershipForm() {
   const form = document.getElementById('membershipForm');
-  if (!form) return;
-
   const stateSel = document.getElementById('memberState');
-  if (stateSel && !stateSel.options.length) {
+  if (!form || !stateSel) return;
+
+  if (!stateSel.options.length) {
     stateSel.innerHTML = '<option value="">Select your state…</option>' +
       NIGERIAN_STATES.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   }
@@ -424,15 +487,9 @@ async function initMembershipForm() {
     const phone = form.querySelector('[name="phone"]').value.trim();
     const state = stateSel.value;
 
-    if (!name || !email || !phone || !state) {
-      alert('Please fill in all fields.');
-      return;
-    }
+    if (!name || !email || !phone || !state) { alert('Please fill in all fields.'); return; }
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting…';
-    }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
     try {
       await data.createMember({ fullName: name, email, phone, state });
       alert(`Thank you, ${name}! Your registration for ${state} has been received. Your State Coordinator will be in touch to confirm.`);
@@ -441,10 +498,7 @@ async function initMembershipForm() {
       console.error(err);
       alert('Sorry — we could not submit your registration right now. Please try again in a moment.');
     } finally {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalLabel;
-      }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
     }
   });
 }
@@ -459,19 +513,23 @@ function initAdmin() {
   const panel = document.getElementById('adminPanel');
   if (!gate || !denied || !panel) return;
 
-  const gateEmail = document.getElementById('gateEmail');
+  const gateForm     = document.getElementById('gateForm');
+  const gateEmail    = document.getElementById('gateEmail');
   const gatePassword = document.getElementById('gatePassword');
-  const gateError = document.getElementById('gateError');
-  const gateBtn = document.getElementById('gateSignIn');
-  const deniedEmail = document.getElementById('deniedEmail');
+  const gateError    = document.getElementById('gateError');
+  const gateBtn      = document.getElementById('gateSignIn');
+  const deniedTitle   = document.getElementById('deniedTitle');
+  const deniedMessage = document.getElementById('deniedMessage');
   const deniedSignOut = document.getElementById('deniedSignOut');
-  const panelEmail = document.getElementById('panelEmail');
-  const panelSignOut = document.getElementById('panelSignOut');
+  const panelEmail    = document.getElementById('panelEmail');
+  const panelSignOut  = document.getElementById('panelSignOut');
 
   /* --- Tabs --- */
   const tabs = Array.from(document.querySelectorAll('.admin-tab'));
   const panels = {
     news:         document.getElementById('tabNews'),
+    leadership:   document.getElementById('tabLeadership'),
+    patrons:      document.getElementById('tabPatrons'),
     execos:       document.getElementById('tabExecos'),
     bot:          document.getElementById('tabBot'),
     coordinators: document.getElementById('tabCoordinators'),
@@ -492,28 +550,31 @@ function initAdmin() {
     });
   });
 
-  /* --- Sign-in --- */
-  gateBtn.addEventListener('click', async () => {
-    if (gateError) gateError.hidden = true;
-    gateBtn.disabled = true;
-    try {
-      const email = gateEmail.value.trim();
-      const pw = gatePassword.value;
-      if (!email || !pw) throw new Error('Please enter your email and password.');
-      await signInWithEmailAndPassword(auth, email, pw);
-    } catch (err) {
-      console.error(err);
-      if (gateError) {
-        gateError.textContent = err.code ? friendlyAuthError(err) : err.message;
-        gateError.hidden = false;
+  /* --- Sign-in (real form → Enter key works) --- */
+  if (gateForm) {
+    gateForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (gateError) gateError.hidden = true;
+      gateBtn.disabled = true;
+      try {
+        const email = gateEmail.value.trim();
+        const pw = gatePassword.value;
+        if (!email || !pw) throw new Error('Please enter your email and password.');
+        await signInWithEmailAndPassword(auth, email, pw);
+      } catch (err) {
+        console.error(err);
+        if (gateError) {
+          gateError.textContent = err.code ? friendlyAuthError(err) : err.message;
+          gateError.hidden = false;
+        }
+      } finally {
+        gateBtn.disabled = false;
       }
-    } finally {
-      gateBtn.disabled = false;
-    }
-  });
+    });
+  }
 
-  deniedSignOut.addEventListener('click', () => signOut(auth));
-  panelSignOut.addEventListener('click', () => signOut(auth));
+  if (deniedSignOut) deniedSignOut.addEventListener('click', () => signOut(auth));
+  if (panelSignOut)  panelSignOut.addEventListener('click', () => signOut(auth));
 
   /* --- Auth state --- */
   onAuthStateChanged(auth, async (user) => {
@@ -525,21 +586,37 @@ function initAdmin() {
       gatePassword.value = '';
       return;
     }
+
     let isAdmin = false;
+    let checkFailed = false;
     try {
       isAdmin = await data.checkAdmin(user);
     } catch (err) {
       console.error(err);
+      checkFailed = true;
     }
-    if (!isAdmin) {
-      deniedEmail.textContent = user.email || '';
+
+    if (checkFailed) {
+      if (deniedTitle)   deniedTitle.textContent = 'Could Not Verify Access';
+      if (deniedMessage) deniedMessage.textContent =
+        'We could not confirm your administrator privileges. This is usually a temporary network issue — please sign out and try again.';
       denied.hidden = false;
       return;
     }
+    if (!isAdmin) {
+      if (deniedTitle)   deniedTitle.textContent = 'Access Denied';
+      if (deniedMessage) deniedMessage.innerHTML =
+        `You are signed in as <strong>${escapeHtml(user.email || '')}</strong>, but this account does not have administrator privileges.`;
+      denied.hidden = false;
+      return;
+    }
+
     panel.hidden = false;
-    panelEmail.textContent = user.email || '';
+    if (panelEmail) panelEmail.textContent = user.email || '';
     await Promise.all([
       renderAdminNews(),
+      loadLeadershipTab(),
+      renderAdminPatrons(),
       renderAdminExecos(),
       renderAdminBOT(),
       renderAdminCoordinators(),
@@ -688,10 +765,7 @@ function initAdmin() {
   }
 
   /* =========================================================
-     Shared "person card admin" factory
-     Used by National Excos and Board of Trustees — identical
-     shape, identical UX. Provides add / edit / reorder / delete
-     with photo upload.
+     Shared person-card admin factory (Patrons, Excos, BOT)
      ========================================================= */
   function buildPersonAdmin(opts) {
     const {
@@ -724,22 +798,18 @@ function initAdmin() {
       photoUrlEl.addEventListener('input', () => {
         const url = photoUrlEl.value.trim();
         if (url) {
-          previewEl.src = url;
-          previewWrap.hidden = false;
-        } else if (!photoEl.files.length) {
-          previewWrap.hidden = true;
+          if (previewEl && previewWrap) { previewEl.src = url; previewWrap.hidden = false; }
+        } else if (!photoEl || !photoEl.files.length) {
+          if (previewWrap) previewWrap.hidden = true;
         }
       });
     }
     if (photoEl) {
       photoEl.addEventListener('change', () => {
         const f = photoEl.files[0];
-        if (f) {
+        if (f && previewEl && previewWrap) {
           const r = new FileReader();
-          r.onload = () => {
-            previewEl.src = r.result;
-            previewWrap.hidden = false;
-          };
+          r.onload = () => { previewEl.src = r.result; previewWrap.hidden = false; };
           r.readAsDataURL(f);
         }
       });
@@ -768,16 +838,18 @@ function initAdmin() {
       const x = cache.find(item => item.id === id);
       if (!x) return;
       editing = { ...x };
-      editIdEl.value = x.id;
-      nameEl.value = x.name;
-      roleEl.value = x.role;
-      orderEl.value = x.displayOrder;
-      photoEl.value = '';
-      photoUrlEl.value = x.photoUrl || '';
-      if (x.photoUrl) { previewEl.src = x.photoUrl; previewWrap.hidden = false; }
-      else previewWrap.hidden = true;
-      submitEl.textContent = editLabel;
-      cancelEl.hidden = false;
+      if (editIdEl) editIdEl.value = x.id;
+      if (nameEl) nameEl.value = x.name;
+      if (roleEl) roleEl.value = x.role;
+      if (orderEl) orderEl.value = x.displayOrder;
+      if (photoEl) photoEl.value = '';
+      if (photoUrlEl) photoUrlEl.value = x.photoUrl || '';
+      if (previewEl && previewWrap) {
+        if (x.photoUrl) { previewEl.src = x.photoUrl; previewWrap.hidden = false; }
+        else previewWrap.hidden = true;
+      }
+      if (submitEl) submitEl.textContent = editLabel;
+      if (cancelEl) cancelEl.hidden = false;
       if (successEl) successEl.hidden = true;
       if (errorEl) errorEl.hidden = true;
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -788,18 +860,18 @@ function initAdmin() {
       if (successEl) successEl.hidden = true;
       if (errorEl) errorEl.hidden = true;
 
-      const name  = nameEl.value.trim();
-      const role  = roleEl.value.trim();
-      const order = Number(orderEl.value) || 0;
+      const name  = nameEl ? nameEl.value.trim() : '';
+      const role  = roleEl ? roleEl.value.trim() : '';
+      const order = orderEl ? (Number(orderEl.value) || 0) : 0;
       if (!name || !role) { showError('Name and position are required.'); return; }
 
-      const id = editIdEl.value;
+      const id = editIdEl ? editIdEl.value : '';
       const isEdit = Boolean(id);
 
       let uploaded = null;
-      submitEl.disabled = true;
+      if (submitEl) submitEl.disabled = true;
       try {
-        const file = photoEl.files[0];
+        const file = photoEl && photoEl.files ? photoEl.files[0] : null;
         let photoUrl = null, photoPath = null, photoDeleteToken = null;
 
         if (file) {
@@ -808,12 +880,17 @@ function initAdmin() {
           photoPath = uploaded.path;
           photoDeleteToken = uploaded.deleteToken;
         } else {
-          const pasted = photoUrlEl.value.trim();
+          const pasted = photoUrlEl ? photoUrlEl.value.trim() : '';
           if (isEdit && editing && pasted && pasted === editing.photoUrl) {
             photoUrl = editing.photoUrl;
             photoPath = editing.photoPath;
             photoDeleteToken = editing.photoDeleteToken;
           } else if (pasted) {
+            try { new URL(pasted); }
+            catch {
+              showError('Please enter a valid image URL (e.g. https://example.com/photo.jpg).');
+              return;
+            }
             photoUrl = pasted;
           }
         }
@@ -824,9 +901,16 @@ function initAdmin() {
           else         await createFn(payload);
         } catch (writeErr) {
           if (uploaded && uploaded.path && uploaded.deleteToken) {
-            await data.deleteStorageFile(uploaded.path, uploaded.deleteToken);
+            try { await data.deleteStorageFile(uploaded.path, uploaded.deleteToken); }
+            catch (cleanupErr) { console.warn('Photo rollback failed:', cleanupErr); }
           }
           throw writeErr;
+        }
+
+        if (isEdit && editing && editing.photoPath && editing.photoDeleteToken &&
+            editing.photoPath !== photoPath) {
+          try { await data.deleteStorageFile(editing.photoPath, editing.photoDeleteToken); }
+          catch (cleanupErr) { console.warn('Old photo cleanup failed:', cleanupErr); }
         }
 
         reset();
@@ -839,7 +923,7 @@ function initAdmin() {
         console.error(err);
         showError(err.message || 'Could not save.');
       } finally {
-        submitEl.disabled = false;
+        if (submitEl) submitEl.disabled = false;
       }
     });
 
@@ -878,7 +962,7 @@ function initAdmin() {
         const isFirst = i === 0;
         const isLast = i === total - 1;
         const thumb = x.photoUrl
-          ? `<img class="admin-thumb" src="${escapeHtml(x.photoUrl)}" alt="">`
+          ? `<img class="admin-thumb" src="${escapeHtml(x.photoUrl)}" alt="" loading="lazy">`
           : `<span class="admin-thumb admin-thumb-initials">${escapeHtml(getInitials(x.name))}</span>`;
         return `
           <div class="admin-list-row">
@@ -908,6 +992,7 @@ function initAdmin() {
       listEl.querySelectorAll('[data-action="delete"]').forEach(b => b.addEventListener('click', async () => {
         if (!confirm('Delete this entry?')) return;
         try {
+          /* deleteFn (delete* in data-service) already removes the Cloudinary asset. */
           await deleteFn(b.dataset.id);
           if (editing && editing.id === b.dataset.id) reset();
           await renderList();
@@ -920,6 +1005,180 @@ function initAdmin() {
 
     return { render: renderList };
   }
+
+  /* =========================================================
+     LEADERSHIP TAB (National Leader + Custodian)
+     ========================================================= */
+  const LEADERSHIP_SLOTS = [
+    { key: 'national_leader', prefix: 'nl' },
+    { key: 'custodian',       prefix: 'cust' }
+  ];
+
+  function initLeadershipTab() {
+    LEADERSHIP_SLOTS.forEach(slot => {
+      const formEl      = document.getElementById(slot.prefix + 'Form');
+      const nameEl      = document.getElementById(slot.prefix + 'Name');
+      const roleEl      = document.getElementById(slot.prefix + 'Role');
+      const photoEl     = document.getElementById(slot.prefix + 'Photo');
+      const photoUrlEl  = document.getElementById(slot.prefix + 'PhotoUrl');
+      const previewWrap = document.getElementById(slot.prefix + 'PreviewWrap');
+      const previewEl   = document.getElementById(slot.prefix + 'Preview');
+      const successEl   = document.getElementById(slot.prefix + 'Success');
+      const errorEl     = document.getElementById(slot.prefix + 'Error');
+      const submitEl    = document.getElementById(slot.prefix + 'Submit');
+
+      if (!formEl) return;
+
+      if (photoUrlEl) {
+        photoUrlEl.addEventListener('input', () => {
+          const url = photoUrlEl.value.trim();
+          if (url && previewEl && previewWrap) {
+            previewEl.src = url; previewWrap.hidden = false;
+          } else if ((!photoEl || !photoEl.files.length) && previewWrap) {
+            previewWrap.hidden = true;
+          }
+        });
+      }
+      if (photoEl) {
+        photoEl.addEventListener('change', () => {
+          const f = photoEl.files[0];
+          if (f && previewEl && previewWrap) {
+            const r = new FileReader();
+            r.onload = () => { previewEl.src = r.result; previewWrap.hidden = false; };
+            r.readAsDataURL(f);
+          }
+        });
+      }
+
+      formEl.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (successEl) successEl.hidden = true;
+        if (errorEl) errorEl.hidden = true;
+
+        const name = nameEl ? nameEl.value.trim() : '';
+        const role = roleEl ? roleEl.value.trim() : '';
+        if (!name) {
+          if (errorEl) { errorEl.textContent = 'Name is required.'; errorEl.hidden = false; }
+          return;
+        }
+
+        if (submitEl) submitEl.disabled = true;
+        let uploaded = null;
+        try {
+          let current = null;
+          try { current = await data.fetchLeadership(slot.key); }
+          catch (fetchErr) { /* no doc yet — first save */ }
+
+          let photoUrl = current ? current.photoUrl : null;
+          let photoPath = current ? current.photoPath : null;
+          let photoDeleteToken = current ? current.photoDeleteToken : null;
+
+          const file = photoEl && photoEl.files ? photoEl.files[0] : null;
+          if (file) {
+            uploaded = await data.uploadToStorage(file);
+            photoUrl = uploaded.url;
+            photoPath = uploaded.path;
+            photoDeleteToken = uploaded.deleteToken;
+          } else {
+            const pasted = photoUrlEl ? photoUrlEl.value.trim() : '';
+            const currentUrl = current ? (current.photoUrl || '') : '';
+            if (pasted !== currentUrl) {
+              if (pasted) {
+                try { new URL(pasted); }
+                catch {
+                  if (errorEl) {
+                    errorEl.textContent = 'Please enter a valid image URL.';
+                    errorEl.hidden = false;
+                  }
+                  return;
+                }
+                photoUrl = pasted;
+                photoPath = null;
+                photoDeleteToken = null;
+              } else {
+                photoUrl = null;
+                photoPath = null;
+                photoDeleteToken = null;
+              }
+            }
+          }
+
+          try {
+            await data.updateLeadership(slot.key, {
+              name, role, photoUrl, photoPath, photoDeleteToken
+            });
+          } catch (writeErr) {
+            if (uploaded && uploaded.path && uploaded.deleteToken) {
+              try { await data.deleteStorageFile(uploaded.path, uploaded.deleteToken); }
+              catch (cleanupErr) { console.warn('Leadership upload rollback failed:', cleanupErr); }
+            }
+            throw writeErr;
+          }
+
+          /* Clean up old Cloudinary photo if it was replaced or cleared. */
+          if (current && current.photoPath && current.photoDeleteToken &&
+              current.photoPath !== photoPath) {
+            try { await data.deleteStorageFile(current.photoPath, current.photoDeleteToken); }
+            catch (cleanupErr) { console.warn('Old leadership photo cleanup failed:', cleanupErr); }
+          }
+
+          if (successEl) { successEl.textContent = 'Saved.'; successEl.hidden = false; }
+        } catch (err) {
+          console.error(err);
+          if (errorEl) {
+            errorEl.textContent = err.message || 'Could not save.';
+            errorEl.hidden = false;
+          }
+        } finally {
+          if (submitEl) submitEl.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function loadLeadershipTab() {
+    for (const slot of LEADERSHIP_SLOTS) {
+      try {
+        const current = await data.fetchLeadership(slot.key);
+        if (!current) continue;
+
+        const nameEl      = document.getElementById(slot.prefix + 'Name');
+        const roleEl      = document.getElementById(slot.prefix + 'Role');
+        const photoUrlEl  = document.getElementById(slot.prefix + 'PhotoUrl');
+        const previewWrap = document.getElementById(slot.prefix + 'PreviewWrap');
+        const previewEl   = document.getElementById(slot.prefix + 'Preview');
+
+        if (nameEl && current.name) nameEl.value = current.name;
+        if (roleEl && current.role) roleEl.value = current.role;
+        if (photoUrlEl && current.photoUrl) photoUrlEl.value = current.photoUrl;
+        if (current.photoUrl && previewEl && previewWrap) {
+          previewEl.src = current.photoUrl;
+          previewWrap.hidden = false;
+        }
+      } catch (err) {
+        console.error('Could not load leadership slot', slot.key, err);
+      }
+    }
+  }
+
+  /* =========================================================
+     PATRONS TAB
+     ========================================================= */
+  const patronAdmin = buildPersonAdmin({
+    formId: 'patronForm', editIdId: 'patronEditId', nameId: 'patronName', roleId: 'patronRole',
+    orderId: 'patronOrder', photoId: 'patronPhoto', photoUrlId: 'patronPhotoUrl',
+    previewWrapId: 'patronPreviewWrap', previewId: 'patronPreview',
+    successId: 'patronSuccess', errorId: 'patronError', submitId: 'patronSubmit',
+    cancelId: 'patronCancel', listId: 'adminPatronList',
+    addLabel: 'Add Patron', editLabel: 'Update Patron',
+    fetchFn: data.fetchPatrons,
+    createFn: data.createPatron,
+    updateFn: data.updatePatron,
+    deleteFn: data.deletePatron,
+    updateOrderFn: data.updatePatronOrder,
+    emptyText: 'No patrons yet.'
+  });
+  const renderAdminPatrons = patronAdmin.render;
 
   /* =========================================================
      EXECOS TAB
@@ -1097,7 +1356,7 @@ function initAdmin() {
   const membersDownloadCsv = document.getElementById('membersDownloadCsv');
 
   let membersCache = [];
-  let membersView = [];   // tracks what is currently visible (respects search)
+  let membersView = [];
 
   function renderMembersRows(items) {
     membersView = items;
@@ -1107,23 +1366,29 @@ function initAdmin() {
       adminMembersList.innerHTML = '<p class="empty-state">No registrations yet.</p>';
       return;
     }
-    adminMembersList.innerHTML = items.map(m => `
-      <div class="admin-list-row">
-        <div class="admin-list-main">
-          <div>
-            <strong>${escapeHtml(m.fullName)}</strong>
-            <span class="admin-list-sub">${escapeHtml(m.email)} · ${escapeHtml(m.phone)}</span>
-            <span class="admin-list-sub">${escapeHtml(m.state)} · <em>${escapeHtml(m.status)}</em>${m.createdAt ? ' · ' + escapeHtml(new Date(m.createdAt).toLocaleDateString('en-GB')) : ''}</span>
+    adminMembersList.innerHTML = items.map(m => {
+      const createdDate = tsToDate(m.createdAt);
+      const createdStr = createdDate && !isNaN(createdDate.getTime())
+        ? createdDate.toLocaleDateString('en-GB')
+        : '';
+      return `
+        <div class="admin-list-row">
+          <div class="admin-list-main">
+            <div>
+              <strong>${escapeHtml(m.fullName)}</strong>
+              <span class="admin-list-sub">${escapeHtml(m.email)} · ${escapeHtml(m.phone)}</span>
+              <span class="admin-list-sub">${escapeHtml(m.state)} · <em>${escapeHtml(m.status)}</em>${createdStr ? ' · ' + escapeHtml(createdStr) : ''}</span>
+            </div>
+          </div>
+          <div class="admin-list-actions">
+            ${m.status !== 'confirmed'
+              ? `<button class="btn btn-small btn-outline-navy" data-action="confirm" data-id="${escapeHtml(m.id)}">Confirm</button>`
+              : ''}
+            <button class="btn btn-small btn-danger" data-action="delete" data-id="${escapeHtml(m.id)}">Delete</button>
           </div>
         </div>
-        <div class="admin-list-actions">
-          ${m.status !== 'confirmed'
-            ? `<button class="btn btn-small btn-outline-navy" data-action="confirm" data-id="${escapeHtml(m.id)}">Confirm</button>`
-            : ''}
-          <button class="btn btn-small btn-danger" data-action="delete" data-id="${escapeHtml(m.id)}">Delete</button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     adminMembersList.querySelectorAll('[data-action="confirm"]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -1177,24 +1442,23 @@ function initAdmin() {
 
   if (membersDownloadCsv) {
     membersDownloadCsv.addEventListener('click', () => {
-      if (!membersView.length) {
-        alert('No registrations to export.');
-        return;
-      }
+      if (!membersView.length) { alert('No registrations to export.'); return; }
       downloadCSV(
         `tpa-members-${todayISO()}.csv`,
         ['Full Name', 'Email', 'Phone', 'State', 'Status', 'Registered'],
-        membersView.map(m => [
-          m.fullName,
-          m.email,
-          m.phone,
-          m.state,
-          m.status,
-          m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 10) : ''
-        ])
+        membersView.map(m => {
+          const d = tsToDate(m.createdAt);
+          return [
+            m.fullName, m.email, m.phone, m.state, m.status,
+            d && !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : ''
+          ];
+        })
       );
     });
   }
+
+  /* Wire up the leadership tab (attaches listeners exactly once). */
+  initLeadershipTab();
 }
 
 /* ---------------------------------------------------------
@@ -1207,8 +1471,10 @@ if (page === 'home') {
   initNav(); initAnimations(); renderNewsPage();
 } else if (page === 'executives') {
   initNav(); initAnimations();
-  renderExecutives();
+  renderLeadership();
+  renderPatrons();
   renderBoardOfTrustees();
+  renderExecutives();
   renderCoordinators();
 } else if (page === 'admin') {
   initNav(); initAdmin();

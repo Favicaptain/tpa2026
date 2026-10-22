@@ -41,7 +41,7 @@
       <div class="gate-card">
         <h1>Content Manager</h1>
         <p>Sign in with your administrator credentials to manage the site.</p>
-        <form class="stack-form" id="gateForm" onsubmit="return false;">
+        <form class="stack-form" id="gateForm" novalidate>
           <label>Email
             <input type="email" id="gateEmail" autocomplete="username" required>
           </label>
@@ -49,18 +49,18 @@
             <input type="password" id="gatePassword" autocomplete="current-password" required>
           </label>
           <p class="form-error" id="gateError" hidden></p>
-          <button type="button" class="btn btn-green btn-block" id="gateSignIn">Sign In</button>
+          <button type="submit" class="btn btn-green btn-block" id="gateSignIn">Sign In</button>
         </form>
       </div>
     </div>
   </section>
 
-  <!-- Access denied -->
+  <!-- Access denied / check failed -->
   <section class="admin-denied" id="adminDenied" hidden>
     <div class="container">
       <div class="gate-card">
-        <h2>Access Denied</h2>
-        <p>You are signed in as <strong id="deniedEmail"></strong>, but this account does not have administrator privileges.</p>
+        <h2 id="deniedTitle">Access Denied</h2>
+        <p id="deniedMessage">You are signed in as <strong id="deniedEmail"></strong>, but this account does not have administrator privileges.</p>
         <button type="button" class="btn btn-outline-navy" id="deniedSignOut">Sign Out</button>
       </div>
     </div>
@@ -78,15 +78,17 @@
       </div>
 
       <div class="admin-tabs" role="tablist">
-        <button class="admin-tab active" data-tab="news" role="tab" aria-selected="true">News</button>
-        <button class="admin-tab" data-tab="execos" role="tab" aria-selected="false">National Excos</button>
-        <button class="admin-tab" data-tab="bot" role="tab" aria-selected="false">Board of Trustees</button>
-        <button class="admin-tab" data-tab="coordinators" role="tab" aria-selected="false">State Coordinators</button>
-        <button class="admin-tab" data-tab="members" role="tab" aria-selected="false">Members</button>
+        <button class="admin-tab active" id="tabBtnNews"         data-tab="news"         role="tab" aria-selected="true"  aria-controls="tabNews">News</button>
+        <button class="admin-tab"        id="tabBtnLeadership"   data-tab="leadership"   role="tab" aria-selected="false" aria-controls="tabLeadership">Leadership</button>
+        <button class="admin-tab"        id="tabBtnPatrons"      data-tab="patrons"      role="tab" aria-selected="false" aria-controls="tabPatrons">Patrons</button>
+        <button class="admin-tab"        id="tabBtnExecos"       data-tab="execos"       role="tab" aria-selected="false" aria-controls="tabExecos">National Excos</button>
+        <button class="admin-tab"        id="tabBtnBot"          data-tab="bot"          role="tab" aria-selected="false" aria-controls="tabBot">Board of Trustees</button>
+        <button class="admin-tab"        id="tabBtnCoordinators" data-tab="coordinators" role="tab" aria-selected="false" aria-controls="tabCoordinators">State Coordinators</button>
+        <button class="admin-tab"        id="tabBtnMembers"      data-tab="members"      role="tab" aria-selected="false" aria-controls="tabMembers">Members</button>
       </div>
 
       <!-- NEWS -->
-      <div class="admin-tab-panel" id="tabNews">
+      <div class="admin-tab-panel" id="tabNews" role="tabpanel" aria-labelledby="tabBtnNews">
         <div class="admin-grid">
           <div class="admin-card">
             <h3>Publish / Edit Article</h3>
@@ -132,8 +134,106 @@
         </div>
       </div>
 
+      <!-- LEADERSHIP (National Leader + Custodian) -->
+      <div class="admin-tab-panel" id="tabLeadership" role="tabpanel" aria-labelledby="tabBtnLeadership" hidden>
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>National Leader</h3>
+            <form class="stack-form" id="nlForm" novalidate>
+              <label>Full Name
+                <input type="text" id="nlName" required>
+              </label>
+              <label>Role Label
+                <input type="text" id="nlRole" value="National Leader">
+              </label>
+              <label>Upload Photo (≤ 500 KB recommended)
+                <input type="file" id="nlPhoto" accept="image/*">
+              </label>
+              <label>…or paste an Image URL
+                <input type="url" id="nlPhotoUrl" placeholder="https://…">
+              </label>
+              <div class="preview-wrap" id="nlPreviewWrap" hidden>
+                <img id="nlPreview" alt="">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="nlSubmit">Save National Leader</button>
+              </div>
+              <p class="form-success" id="nlSuccess" hidden></p>
+              <p class="form-error" id="nlError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Custodian</h3>
+            <form class="stack-form" id="custForm" novalidate>
+              <label>Full Name
+                <input type="text" id="custName" required>
+              </label>
+              <label>Role Label
+                <input type="text" id="custRole" value="Custodian">
+              </label>
+              <label>Upload Photo (≤ 500 KB recommended)
+                <input type="file" id="custPhoto" accept="image/*">
+              </label>
+              <label>…or paste an Image URL
+                <input type="url" id="custPhotoUrl" placeholder="https://…">
+              </label>
+              <div class="preview-wrap" id="custPreviewWrap" hidden>
+                <img id="custPreview" alt="">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="custSubmit">Save Custodian</button>
+              </div>
+              <p class="form-success" id="custSuccess" hidden></p>
+              <p class="form-error" id="custError" hidden></p>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- PATRONS -->
+      <div class="admin-tab-panel" id="tabPatrons" role="tabpanel" aria-labelledby="tabBtnPatrons" hidden>
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Add / Edit Patron</h3>
+            <form class="stack-form" id="patronForm" novalidate>
+              <input type="hidden" id="patronEditId">
+              <label>Full Name
+                <input type="text" id="patronName" required>
+              </label>
+              <label>Role / Title
+                <input type="text" id="patronRole" placeholder="e.g. Grand Patron" required>
+              </label>
+              <label>Display Order
+                <input type="number" id="patronOrder" value="0" step="1">
+              </label>
+              <label>Upload Photo (≤ 500 KB recommended)
+                <input type="file" id="patronPhoto" accept="image/*">
+              </label>
+              <label>…or paste an Image URL
+                <input type="url" id="patronPhotoUrl" placeholder="https://…">
+              </label>
+              <div class="preview-wrap" id="patronPreviewWrap" hidden>
+                <img id="patronPreview" alt="">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-green" id="patronSubmit">Add Patron</button>
+                <button type="button" class="btn btn-ghost" id="patronCancel" hidden>Cancel Edit</button>
+              </div>
+              <p class="form-success" id="patronSuccess" hidden></p>
+              <p class="form-error" id="patronError" hidden></p>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Current Patrons</h3>
+            <div class="admin-list" id="adminPatronList">
+              <p class="empty-state">Loading…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- EXECOS -->
-      <div class="admin-tab-panel" id="tabExecos" hidden>
+      <div class="admin-tab-panel" id="tabExecos" role="tabpanel" aria-labelledby="tabBtnExecos" hidden>
         <div class="admin-grid">
           <div class="admin-card">
             <h3>Add / Edit Executive</h3>
@@ -175,7 +275,7 @@
       </div>
 
       <!-- BOT -->
-      <div class="admin-tab-panel" id="tabBot" hidden>
+      <div class="admin-tab-panel" id="tabBot" role="tabpanel" aria-labelledby="tabBtnBot" hidden>
         <div class="admin-grid">
           <div class="admin-card">
             <h3>Add / Edit Trustee</h3>
@@ -217,7 +317,7 @@
       </div>
 
       <!-- COORDINATORS -->
-      <div class="admin-tab-panel" id="tabCoordinators" hidden>
+      <div class="admin-tab-panel" id="tabCoordinators" role="tabpanel" aria-labelledby="tabBtnCoordinators" hidden>
         <div class="admin-grid">
           <div class="admin-card">
             <h3>Add Coordinator</h3>
@@ -249,7 +349,7 @@
       </div>
 
       <!-- MEMBERS -->
-      <div class="admin-tab-panel" id="tabMembers" hidden>
+      <div class="admin-tab-panel" id="tabMembers" role="tabpanel" aria-labelledby="tabBtnMembers" hidden>
         <div class="admin-card">
           <h3>Membership Registrations (<span id="membersCount">0</span>)</h3>
           <div class="admin-members-toolbar">

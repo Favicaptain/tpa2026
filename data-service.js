@@ -1,15 +1,15 @@
 import { db } from './firebase-config.js';
 import {
   collection, query, orderBy, limit, getDocs, addDoc, doc,
-  updateDoc, deleteDoc, getDoc, serverTimestamp
+  updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 /* ---------------------------------------------------------------------------
    Cloudinary configuration — fill these two values from your Cloudinary console
    --------------------------------------------------------------------------- */
 
-const CLOUDINARY_CLOUD_NAME    = 'YOUR_CLOUD_NAME';      // e.g. 'dxxxxxx'
-const CLOUDINARY_UPLOAD_PRESET = 'YOUR_UPLOAD_PRESET';   // e.g. 'tpa_unsigned'
+const CLOUDINARY_CLOUD_NAME    = 'th1ixgex';      // e.g. 'dxxxxxx'
+const CLOUDINARY_UPLOAD_PRESET = 'tpa_unsigned';   // e.g. 'tpa_unsigned'
 
 /* ---------------------------------------------------------------------------
    Constants
@@ -23,6 +23,9 @@ export const NIGERIAN_STATES = [
   'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
   'Federal Capital Territory'
 ];
+
+/** Valid keys for the site_settings/{"roleKey"} leadership documents */
+const LEADERSHIP_ROLES = ['national_leader', 'custodian'];
 
 /* ---------------------------------------------------------------------------
    Helpers
@@ -98,6 +101,53 @@ export async function updateNews(id, newsData) {
 
 export async function deleteNews(id) {
   await deleteDoc(doc(db, 'news', id));
+}
+
+/* ---------------------------------------------------------------------------
+   Site leadership — single, fixed documents in site_settings
+   ("national_leader" and "custodian"). Both use the same shape.
+   --------------------------------------------------------------------------- */
+
+function mapLeadership(data) {
+  return {
+    name: data.name || '',
+    role: data.role || '',
+    photoUrl: data.photoUrl || null,
+    photoPath: data.photoPath || null,
+    photoDeleteToken: data.photoDeleteToken || null
+  };
+}
+
+/**
+ * Load one of the fixed leadership slots.
+ * @param {'national_leader'|'custodian'} roleKey
+ * @returns {Promise<{name,role,photoUrl,photoPath,photoDeleteToken}|null>}
+ */
+export async function fetchLeadership(roleKey) {
+  if (!LEADERSHIP_ROLES.includes(roleKey)) return null;
+  const snap = await getDoc(doc(db, 'site_settings', roleKey));
+  if (!snap.exists()) return null;
+  return mapLeadership(snap.data());
+}
+
+/**
+ * Save one of the fixed leadership slots.
+ * Creates the document on first save, updates it thereafter.
+ * @param {'national_leader'|'custodian'} roleKey
+ */
+export async function updateLeadership(roleKey, payload) {
+  if (!LEADERSHIP_ROLES.includes(roleKey)) {
+    throw new Error('Unknown leadership role: ' + roleKey);
+  }
+  const clean = {
+    name: payload.name || '',
+    role: payload.role || '',
+    photoUrl: payload.photoUrl || null,
+    photoPath: payload.photoPath || null,
+    photoDeleteToken: payload.photoDeleteToken || null,
+    updatedAt: serverTimestamp()
+  };
+  await setDoc(doc(db, 'site_settings', roleKey), clean, { merge: true });
 }
 
 /* ---------------------------------------------------------------------------
@@ -249,6 +299,80 @@ export async function deleteTrustee(id) {
 }
 
 /* ---------------------------------------------------------------------------
+   Patrons — same shape as Board of Trustees
+   --------------------------------------------------------------------------- */
+
+function mapPatron(d) {
+  const data = d.data();
+  return {
+    id: d.id,
+    name: data.name || '',
+    role: data.role || '',
+    photoUrl: data.photoUrl || null,
+    photoPath: data.photoPath || null,
+    photoDeleteToken: data.photoDeleteToken || null,
+    displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 0,
+    createdAt: toISO(data.createdAt)
+  };
+}
+
+export async function fetchPatrons() {
+  const snap = await getDocs(collection(db, 'patrons'));
+  const items = snap.docs.map(mapPatron);
+  items.sort((a, b) => {
+    const ao = Number(a.displayOrder) || 0;
+    const bo = Number(b.displayOrder) || 0;
+    if (ao !== bo) return ao - bo;
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+  return items;
+}
+
+export async function createPatron(patronData) {
+  const payload = {
+    name: patronData.name,
+    role: patronData.role,
+    photoUrl: patronData.photoUrl || null,
+    photoPath: patronData.photoPath || null,
+    photoDeleteToken: patronData.photoDeleteToken || null,
+    displayOrder: Number(patronData.displayOrder) || 0,
+    createdAt: serverTimestamp()
+  };
+  const refDoc = await addDoc(collection(db, 'patrons'), payload);
+  return refDoc.id;
+}
+
+export async function updatePatron(id, patronData) {
+  const payload = {
+    name: patronData.name,
+    role: patronData.role,
+    photoUrl: patronData.photoUrl || null,
+    photoPath: patronData.photoPath || null,
+    photoDeleteToken: patronData.photoDeleteToken || null,
+    displayOrder: Number(patronData.displayOrder) || 0
+  };
+  await updateDoc(doc(db, 'patrons', id), payload);
+}
+
+export async function updatePatronOrder(id, displayOrder) {
+  await updateDoc(doc(db, 'patrons', id), {
+    displayOrder: Number(displayOrder) || 0
+  });
+}
+
+export async function deletePatron(id) {
+  const docRef = doc(db, 'patrons', id);
+  const snap = await getDoc(docRef);
+  const data = snap.exists() ? snap.data() : {};
+  const publicId = data.photoPath || null;
+  const deleteToken = data.photoDeleteToken || null;
+  await deleteDoc(docRef);
+  if (publicId && deleteToken) {
+    await deleteCloudinaryImage(publicId, deleteToken);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    State Coordinators
    --------------------------------------------------------------------------- */
 
@@ -289,10 +413,6 @@ export async function deleteCoordinator(id) {
   await deleteDoc(doc(db, 'state_coordinators', id));
 }
 
-/**
- * Bulk-imports the given coordinator list, skipping any whose
- * (name, state) pair already exists. Returns a summary.
- */
 export async function seedCoordinators(list) {
   const existing = await fetchStateCoordinators();
   const existingKeys = new Set(
@@ -306,11 +426,7 @@ export async function seedCoordinators(list) {
       continue;
     }
     try {
-      await createCoordinator({
-        name: c.name,
-        state: c.state,
-        lga: c.lga
-      });
+      await createCoordinator({ name: c.name, state: c.state, lga: c.lga });
       summary.added++;
     } catch (err) {
       summary.errors.push(`${c.name}: ${err.message}`);
@@ -320,7 +436,7 @@ export async function seedCoordinators(list) {
 }
 
 /* ---------------------------------------------------------------------------
-   Members — public registration + admin management
+   Members
    --------------------------------------------------------------------------- */
 
 function mapMember(d) {
@@ -377,18 +493,9 @@ export async function checkAdmin(user) {
 
 /* ---------------------------------------------------------------------------
    Media — Cloudinary
-   Photos are resized client-side before upload so Cloudinary stores tiny
-   files and the site stays fast on slow connections.
    --------------------------------------------------------------------------- */
 
-/**
- * Resize an image to fit within maxDim × maxDim (preserving aspect ratio)
- * and re-encode as JPEG at the given quality. GIFs are passed through
- * untouched so animation is not destroyed. If resizing fails or produces
- * a larger file, the original is returned.
- */
 async function resizeImage(file, maxDim = 800, quality = 0.85) {
-  // GIFs must not be resized — would destroy animation
   if (file.type === 'image/gif') return file;
 
   return new Promise((resolve) => {
@@ -397,14 +504,8 @@ async function resizeImage(file, maxDim = 800, quality = 0.85) {
 
     img.onload = () => {
       URL.revokeObjectURL(blobUrl);
-
       const { width, height } = img;
-
-      // Already small enough — keep original
-      if (width <= maxDim && height <= maxDim) {
-        resolve(file);
-        return;
-      }
+      if (width <= maxDim && height <= maxDim) { resolve(file); return; }
 
       const ratio = Math.min(maxDim / width, maxDim / height);
       const newW = Math.round(width * ratio);
@@ -427,14 +528,13 @@ async function resizeImage(file, maxDim = 800, quality = 0.85) {
           type: 'image/jpeg',
           lastModified: Date.now()
         });
-        // Only use the resized version if it actually got smaller
         resolve(resized.size < file.size ? resized : file);
       }, 'image/jpeg', quality);
     };
 
     img.onerror = () => {
       URL.revokeObjectURL(blobUrl);
-      resolve(file);   // fall back to the original if anything fails
+      resolve(file);
     };
 
     img.src = blobUrl;
@@ -449,8 +549,6 @@ export async function uploadToStorage(file) {
     throw new Error('Image must be smaller than 5 MB.');
   }
 
-  // Resize client-side: max 800×800, JPEG quality 0.85
-  // Typical result: 4 MB phone photo → ~80–150 KB
   const toUpload = await resizeImage(file, 800, 0.85);
 
   const formData = new FormData();
@@ -478,12 +576,14 @@ export async function deleteStorageFile(publicId, deleteToken) {
   try {
     const formData = new FormData();
     formData.append('public_id', publicId);
-    formData.append('delete_token', deleteToken);
+    formData.append('token', deleteToken);
 
-    const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
+    const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/delete_by_token`;
     const res = await fetch(url, { method: 'POST', body: formData });
+
     if (!res.ok) {
-      console.warn('Cloudinary delete returned', res.status);
+      const body = await res.text().catch(() => '');
+      console.warn(`Cloudinary delete failed (${res.status}) for "${publicId}":`, body);
     }
   } catch (err) {
     console.warn('Cloudinary cleanup failed for', publicId, err);

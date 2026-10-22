@@ -1282,6 +1282,102 @@ body.dialog-open { overflow: hidden; }
   padding-top: 14px;
   border-top: 1px dashed var(--border);
 }
+/* ---------- Admin members toolbar (search + CSV button) ---------- */
+.admin-members-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.admin-members-toolbar .search-wrap {
+  margin-bottom: 0;
+  flex: 1 1 260px;
+  max-width: 480px;
+}
+
+/* ---------- Supreme leadership (National Leader + Custodian) ---------- */
+.leadership-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.leadership-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px 24px 30px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.leadership-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.leadership-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--skyblue) 100%);
+}
+.leadership-photo {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--green-deep) 0%, var(--green-deepest) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(5, 61, 32, 0.22);
+}
+.leadership-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.leadership-photo-fallback {
+  color: var(--skyblue);
+  font-size: 3.5rem;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.leadership-card h3 {
+  font-family: var(--font-body);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--green-deep);
+  line-height: 1.35;
+}
+.leadership-role {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--green);
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .leadership-grid { grid-template-columns: 1fr; gap: 20px; }
+  .leadership-photo { width: 150px; height: 150px; }
+  .leadership-card { padding: 30px 20px 24px; }
+}
 
 .coord-icon {
   width: 14px;
