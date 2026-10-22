@@ -76,23 +76,12 @@
         <i class="fa-solid fa-magnifying-glass"></i>
         <input id="coordSearch" type="search" placeholder="Search by name, state or LGA…">
       </div>
-      <div class="table-wrap">
-        <table class="coord-table">
-          <thead>
-            <tr>
-              <th>S/N</th>
-              <th>Full Name</th>
-              <th>State</th>
-              <th>Local Government Area</th>
-            </tr>
-          </thead>
-          <tbody id="coordTableBody"></tbody>
-        </table>
-      </div>
+      <div class="coord-grid" id="coordGrid"></div>
       <p class="empty-state" id="coordEmpty" hidden>No coordinators found.</p>
     </div>
   </section>
 
+ 
   <footer class="site-footer">
     <div class="container">
       <div class="footer-top">
@@ -112,7 +101,7 @@
       </div>
       <div class="footer-bottom">
         <p>© 2026 Tinubu Progressive Advocates. All rights reserved.</p>
-        <a href="admin.html" class="admin-link">Admin Panel</a>
+        <a href="console.html" class="admin-link">Admin Panel</a>
       </div>
     </div>
   </footer>

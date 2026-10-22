@@ -1181,3 +1181,116 @@ body.dialog-open { overflow: hidden; }
   .brand-sub { font-size: 0.6rem; }
   .stats-row { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------- Coordinator cards (replaces the old table) ---------- */
+.coord-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.coord-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 22px 22px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+/* Gradient accent bar across the top of every card */
+.coord-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--skyblue) 100%);
+}
+
+.coord-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+/* Initials avatar */
+.coord-card-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--green-deep) 0%, var(--green-deepest) 100%);
+  color: var(--skyblue);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(5, 61, 32, 0.18);
+}
+
+.coord-card-name {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--green-deep);
+  margin: 0 0 14px;
+  line-height: 1.35;
+  min-height: 2.7em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coord-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.coord-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.coord-badge-state {
+  background: var(--skyblue-light);
+  color: var(--skyblue-dark);
+}
+
+.coord-card-lga {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  color: var(--muted);
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.coord-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Slightly more compact on mobile */
+@media (max-width: 480px) {
+  .coord-grid { grid-template-columns: 1fr; }
+  .coord-card { padding: 28px 18px 18px; }
+}

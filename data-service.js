@@ -1,4 +1,3 @@
-
 import { db } from './firebase-config.js';
 import {
   collection, query, orderBy, limit, getDocs, addDoc, doc,
@@ -6,11 +5,15 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 /* ---------------------------------------------------------------------------
-   Cloudinary configuration
+   Cloudinary configuration — fill these two values from your Cloudinary console
    --------------------------------------------------------------------------- */
 
-const CLOUDINARY_CLOUD_NAME    = 'th1ixgex';    
-const CLOUDINARY_UPLOAD_PRESET = 'tpa_unsigned';
+const CLOUDINARY_CLOUD_NAME    = 'YOUR_CLOUD_NAME';      // e.g. 'dxxxxxx'
+const CLOUDINARY_UPLOAD_PRESET = 'YOUR_UPLOAD_PRESET';   // e.g. 'tpa_unsigned'
+
+/* ---------------------------------------------------------------------------
+   Constants
+   --------------------------------------------------------------------------- */
 
 export const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
@@ -374,7 +377,69 @@ export async function checkAdmin(user) {
 
 /* ---------------------------------------------------------------------------
    Media — Cloudinary
+   Photos are resized client-side before upload so Cloudinary stores tiny
+   files and the site stays fast on slow connections.
    --------------------------------------------------------------------------- */
+
+/**
+ * Resize an image to fit within maxDim × maxDim (preserving aspect ratio)
+ * and re-encode as JPEG at the given quality. GIFs are passed through
+ * untouched so animation is not destroyed. If resizing fails or produces
+ * a larger file, the original is returned.
+ */
+async function resizeImage(file, maxDim = 800, quality = 0.85) {
+  // GIFs must not be resized — would destroy animation
+  if (file.type === 'image/gif') return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+
+      const { width, height } = img;
+
+      // Already small enough — keep original
+      if (width <= maxDim && height <= maxDim) {
+        resolve(file);
+        return;
+      }
+
+      const ratio = Math.min(maxDim / width, maxDim / height);
+      const newW = Math.round(width * ratio);
+      const newH = Math.round(height * ratio);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = newW;
+      canvas.height = newH;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, newW, newH);
+
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        const baseName = file.name.replace(/\.\w+$/, '') || 'photo';
+        const resized = new File([blob], `${baseName}.jpg`, {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+        // Only use the resized version if it actually got smaller
+        resolve(resized.size < file.size ? resized : file);
+      }, 'image/jpeg', quality);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      resolve(file);   // fall back to the original if anything fails
+    };
+
+    img.src = blobUrl;
+  });
+}
 
 export async function uploadToStorage(file) {
   if (!file || !file.type.startsWith('image/')) {
@@ -384,8 +449,12 @@ export async function uploadToStorage(file) {
     throw new Error('Image must be smaller than 5 MB.');
   }
 
+  // Resize client-side: max 800×800, JPEG quality 0.85
+  // Typical result: 4 MB phone photo → ~80–150 KB
+  const toUpload = await resizeImage(file, 800, 0.85);
+
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', toUpload);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;

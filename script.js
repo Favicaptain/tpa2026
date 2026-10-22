@@ -327,49 +327,74 @@ function cardHtmlForPerson(x) {
 }
 
 async function renderCoordinators() {
-  const tbody = document.getElementById('coordTableBody');
+  const grid = document.getElementById('coordGrid');
   const empty = document.getElementById('coordEmpty');
   const search = document.getElementById('coordSearch');
-  if (!tbody) return;
+  if (!grid) return;
 
   let coords = [];
   try {
     coords = await data.fetchStateCoordinators();
   } catch (err) {
     console.error(err);
-    tbody.innerHTML = '';
-    if (empty) { empty.hidden = false; empty.textContent = 'Could not load coordinators.'; }
+    grid.innerHTML = '';
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent = 'Could not load coordinators.';
+    }
     return;
   }
 
-  function renderRows(items) {
+  /* Inline SVG icons — no external dependency */
+  const svgPin = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const svgMap = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`;
+
+  function renderCards(items, animate = false) {
     if (!items.length) {
-      tbody.innerHTML = '';
-      if (empty) { empty.hidden = false; empty.textContent = 'No coordinators found.'; }
+      grid.innerHTML = '';
+      if (empty) {
+        empty.hidden = false;
+        empty.textContent = coords.length
+          ? 'No coordinators match your search.'
+          : 'No coordinators found.';
+      }
       return;
     }
     if (empty) empty.hidden = true;
-    tbody.innerHTML = items.map((c, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${escapeHtml(c.name)}</td>
-        <td>${escapeHtml(c.state)}</td>
-        <td>${escapeHtml(c.lga)}</td>
-      </tr>
+    grid.innerHTML = items.map(c => `
+      <article class="coord-card ${animate ? 'fade-up' : ''}">
+        <div class="coord-card-avatar">${escapeHtml(getInitials(c.name))}</div>
+        <h3 class="coord-card-name">${escapeHtml(c.name)}</h3>
+        <div class="coord-card-badges">
+          <span class="coord-badge coord-badge-state">
+            ${svgPin}
+            ${escapeHtml(c.state)}
+          </span>
+        </div>
+        <div class="coord-card-lga">
+          ${svgMap}
+          <span>${escapeHtml(c.lga)}</span>
+        </div>
+      </article>
     `).join('');
+    if (animate) observeFadeUps(grid);
   }
 
-  renderRows(coords);
+  renderCards(coords, true);   // initial load → animate in
 
   if (search) {
     search.addEventListener('input', () => {
       const q = search.value.trim().toLowerCase();
+      if (!q) {
+        renderCards(coords, false);
+        return;
+      }
       const filtered = coords.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.state.toLowerCase().includes(q) ||
         c.lga.toLowerCase().includes(q)
       );
-      renderRows(filtered);
+      renderCards(filtered, false);   // search → no animation, instant
     });
   }
 }
