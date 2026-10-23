@@ -514,11 +514,11 @@ table.coord-table td:nth-child(3) { width: 22%; }
 /* On small screens, give name more breathing room and shrink LGA further */
 @media (max-width: 640px) {
   table.coord-table th:nth-child(1),
-  table.coord-table td:nth-child(1) { width: 55%; }
+  table.coord-table td:nth-child(1) { width: 40%; }
   table.coord-table th:nth-child(2),
-  table.coord-table td:nth-child(2) { width: 20%; }
+  table.coord-table td:nth-child(2) { width: 30%; }
   table.coord-table th:nth-child(3),
-  table.coord-table td:nth-child(3) { width: 25%; }
+  table.coord-table td:nth-child(3) { width: 30%; }
 }
 
 /* ---------- Empty state ---------- */
