@@ -1,299 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Panel — Tinubu Progressive Advocates</title>
-  <meta name="robots" content="noindex,nofollow">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="icon" href="favicon.ico">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What exactly are you looking for?</title>
+<style>
+  :root{
+    --ink:#e9edff;
+    --accent:#ffd166;
+    --shoe:#141a2c;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:clamp(4px, 2vh, 20px);
+    padding:24px 16px;
+    overflow:hidden;
+    background:radial-gradient(120% 85% at 50% 0%, #1e2750 0%, #10152e 48%, #070a16 100%);
+    color:var(--ink);
+    font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------------- title ---------------- */
+  .title{
+    margin:0;
+    text-align:center;
+    font-weight:800;
+    font-size:clamp(20px, 5.2vw, 42px);
+    line-height:1.15;
+    letter-spacing:-.02em;
+    animation:rise .85s cubic-bezier(.2,.8,.25,1) both;
+  }
+
+  .title .line2{
+    display:block;
+    background:linear-gradient(90deg,#ffd166,#ff9f6e,#ffd166);
+    background-size:200% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    -webkit-text-fill-color:transparent;
+    animation:rise .85s .1s cubic-bezier(.2,.8,.25,1) both,
+              shimmer 5s linear infinite;
+  }
+
+  @keyframes rise{
+    from{opacity:0; transform:translateY(16px)}
+    to  {opacity:1; transform:translateY(0)}
+  }
+
+  @keyframes shimmer{
+    to{background-position:200% 0}
+  }
+
+  /* ---------------- stage ---------------- */
+  .stage{
+    display:block;
+    height:min(56vh, 380px);
+    width:auto;
+    filter:drop-shadow(0 18px 26px rgba(0,0,0,.45));
+  }
+
+  .anchor{fill:none}
+
+  /* ---------------- walk cycle ---------------- */
+  .walker{
+    animation:bodyBob .9s ease-in-out infinite;
+  }
+
+  @keyframes bodyBob{
+    0%   {transform:translate(0, 7px)}
+    25%  {transform:translate(1.5px, 0)}
+    50%  {transform:translate(0, 7px)}
+    75%  {transform:translate(-1.5px, 0)}
+    100% {transform:translate(0, 7px)}
+  }
+
+  /* every rotating part carries an invisible "anchor" rect centred on its
+     joint, so 50%/50% of its bounding box is always exactly the pivot. */
+  .leg, .shin, .arm, .head{
+    transform-box:fill-box;
+    transform-origin:50% 50%;
+  }
+
+  .leg {animation:thighSwing .9s ease-in-out infinite}
+  .shin{animation:shinSwing  .9s ease-in-out infinite}
+  .arm {animation:armSwing   .9s ease-in-out infinite}
+  .head{animation:headTilt   4s  ease-in-out infinite}
+
+  .leg.phase2, .shin.phase2, .arm.phase2{animation-delay:-.45s}
+
+  @keyframes thighSwing{
+    0%,100%{transform:rotate(-24deg)}
+    50%    {transform:rotate(24deg)}
+  }
+
+  @keyframes shinSwing{
+    0%  {transform:rotate(5deg)}
+    35% {transform:rotate(7deg)}
+    52% {transform:rotate(22deg)}
+    70% {transform:rotate(58deg)}
+    90% {transform:rotate(12deg)}
+    100%{transform:rotate(5deg)}
+  }
+
+  @keyframes armSwing{
+    0%,100%{transform:rotate(28deg)}
+    50%    {transform:rotate(-28deg)}
+  }
+
+  @keyframes headTilt{
+    0%  {transform:rotate(-7deg)}
+    28% {transform:rotate(6deg)}
+    55% {transform:rotate(-3deg)}
+    78% {transform:rotate(9deg)}
+    100%{transform:rotate(-7deg)}
+  }
+
+  /* ---------------- ground & shadow ---------------- */
+  .ground{animation:scrollGround .9s linear infinite}
+  @keyframes scrollGround{
+    to{stroke-dashoffset:-36}
+  }
+
+  .shadow{
+    transform-box:fill-box;
+    transform-origin:50% 50%;
+    animation:shadowPulse .9s ease-in-out infinite;
+  }
+  @keyframes shadowPulse{
+    0%,50%,100%{transform:scaleX(1);    opacity:.6}
+    25%,75%    {transform:scaleX(.86);  opacity:.42}
+  }
+
+  /* ---------------- question marks ---------------- */
+  .q{
+    transform-box:fill-box;
+    transform-origin:50% 50%;
+    opacity:0;
+    animation:floatQ 3.6s ease-in-out infinite;
+  }
+  .q:nth-child(1){animation-delay:.2s}
+  .q:nth-child(2){animation-delay:1.4s}
+  .q:nth-child(3){animation-delay:2.6s}
+
+  @keyframes floatQ{
+    0%  {opacity:0; transform:translate(0, 8px)  scale(.5)  rotate(-12deg)}
+    20% {opacity:1; transform:translate(0,-2px)  scale(1)   rotate(0deg)}
+    70% {opacity:1; transform:translate(2px,-16px) scale(1) rotate(8deg)}
+    100%{opacity:0; transform:translate(4px,-26px) scale(.85) rotate(14deg)}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .walker, .leg, .shin, .arm, .head, .ground, .shadow, .q, .title, .title .line2{
+      animation-duration:6s;
+    }
+  }
+</style>
 </head>
-<body data-page="admin">
+<body>
 
-  <header class="site-header">
-    <div class="container nav-inner">
-      <a href="index.html" class="brand">
-        <img src="logo.png" alt="TPA logo" class="brand-logo">
-        <div class="brand-text">
-          <span class="brand-title">TINUBU PROGRESSIVE ADVOCATES</span>
-          <span class="brand-sub">National Advocacy &amp; Grassroots Mobilisation</span>
-        </div>
-      </a>
-      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
-      <nav class="nav-links" id="navLinks">
-        <a href="index.html" data-nav="home">Home</a>
-        <a href="about.html" data-nav="about">About Us</a>
-        <a href="news.html" data-nav="news">News &amp; Events</a>
-        <a href="executives.html" data-nav="executives">Executives</a>
-      </nav>
-    </div>
-  </header>
+  <h1 class="title">
+    What exactly
+    <span class="line2">are you looking for?</span>
+  </h1>
 
-  <!-- Sign-in gate -->
-  <section class="admin-gate" id="adminGate">
-    <div class="container">
-      <div class="gate-card">
-        <h1>Content Manager</h1>
-        <p>Sign in with your administrator credentials to manage the site.</p>
-        <form class="stack-form" id="gateForm" onsubmit="return false;">
-          <label>Email
-            <input type="email" id="gateEmail" autocomplete="username" required>
-          </label>
-          <label>Password
-            <input type="password" id="gatePassword" autocomplete="current-password" required>
-          </label>
-          <p class="form-error" id="gateError" hidden></p>
-          <button type="button" class="btn btn-green btn-block" id="gateSignIn">Sign In</button>
-        </form>
-      </div>
-    </div>
-  </section>
+  <svg class="stage" viewBox="0 0 240 360" role="img"
+       aria-label="A confused man pacing in place, looking around">
+    <defs>
+      <linearGradient id="shirtGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7aa8ff"/>
+        <stop offset="1" stop-color="#3f6bd0"/>
+      </linearGradient>
+      <linearGradient id="pantsGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3b4878"/>
+        <stop offset="1" stop-color="#232a44"/>
+      </linearGradient>
+      <radialGradient id="haloGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#5b8def" stop-opacity=".30"/>
+        <stop offset="1" stop-color="#5b8def" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
 
-  <!-- Access denied -->
-  <section class="admin-denied" id="adminDenied" hidden>
-    <div class="container">
-      <div class="gate-card">
-        <h2>Access Denied</h2>
-        <p>You are signed in as <strong id="deniedEmail"></strong>, but this account does not have administrator privileges.</p>
-        <button type="button" class="btn btn-outline-navy" id="deniedSignOut">Sign Out</button>
-      </div>
-    </div>
-  </section>
+    <!-- soft halo -->
+    <ellipse cx="120" cy="170" rx="150" ry="150" fill="url(#haloGrad)"/>
 
-  <!-- Panel -->
-  <section class="admin-shell" id="adminPanel" hidden>
-    <div class="container">
-      <div class="admin-header">
-        <div>
-          <h1 class="admin-title">Content Manager</h1>
-          <p class="admin-signedin">Signed in as <strong id="panelEmail"></strong></p>
-        </div>
-        <button type="button" class="btn btn-outline-navy" id="panelSignOut">Sign Out</button>
-      </div>
+    <!-- scrolling ground -->
+    <line class="ground" x1="-20" y1="322" x2="260" y2="322"
+          stroke="#28325a" stroke-width="3" stroke-linecap="round"
+          stroke-dasharray="20 16"/>
 
-      <div class="admin-tabs" role="tablist">
-        <button class="admin-tab active" data-tab="news" role="tab" aria-selected="true">News</button>
-        <button class="admin-tab" data-tab="execos" role="tab" aria-selected="false">National Excos</button>
-        <button class="admin-tab" data-tab="bot" role="tab" aria-selected="false">Board of Trustees</button>
-        <button class="admin-tab" data-tab="coordinators" role="tab" aria-selected="false">State Coordinators</button>
-        <button class="admin-tab" data-tab="members" role="tab" aria-selected="false">Members</button>
-      </div>
+    <!-- shadow -->
+    <ellipse class="shadow" cx="120" cy="325" rx="50" ry="8"
+             fill="#03050c" opacity=".6"/>
 
-      <!-- NEWS -->
-      <div class="admin-tab-panel" id="tabNews">
-        <div class="admin-grid">
-          <div class="admin-card">
-            <h3>Publish / Edit Article</h3>
-            <form class="stack-form" id="newsForm" novalidate>
-              <input type="hidden" id="newsEditId">
-              <label>Headline
-                <input type="text" id="newsTitle" required>
-              </label>
-              <div class="form-row">
-                <label>Date
-                  <input type="date" id="newsDate" required>
-                </label>
-                <label>Category
-                  <select id="newsCategory" required>
-                    <option value="Announcement">Announcement</option>
-                    <option value="News">News</option>
-                    <option value="Event">Event</option>
-                    <option value="Press Release">Press Release</option>
-                  </select>
-                </label>
-              </div>
-              <label>Short Summary (max 220 chars)
-                <textarea id="newsSnippet" rows="2" maxlength="220" required></textarea>
-              </label>
-              <label>Full Article
-                <textarea id="newsBody" rows="9" required></textarea>
-              </label>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-green" id="newsSubmit">Publish Article</button>
-                <button type="button" class="btn btn-ghost" id="newsCancel" hidden>Cancel Edit</button>
-                <button type="button" class="btn btn-ghost" id="newsClear">Clear</button>
-              </div>
-              <p class="form-success" id="newsSuccess" hidden></p>
-              <p class="form-error" id="newsError" hidden></p>
-            </form>
-          </div>
-          <div class="admin-card">
-            <h3>Articles</h3>
-            <div class="admin-list" id="adminNewsList">
-              <p class="empty-state">Loading…</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <g class="walker">
 
-      <!-- EXECOS -->
-      <div class="admin-tab-panel" id="tabExecos" hidden>
-        <div class="admin-grid">
-          <div class="admin-card">
-            <h3>Add / Edit Executive</h3>
-            <form class="stack-form" id="execoForm" novalidate>
-              <input type="hidden" id="execoEditId">
-              <label>Full Name
-                <input type="text" id="execoName" required>
-              </label>
-              <label>Post Held
-                <input type="text" id="execoRole" required>
-              </label>
-              <label>Display Order
-                <input type="number" id="execoOrder" value="0" step="1">
-              </label>
-              <label>Upload Photo (≤ 500 KB recommended)
-                <input type="file" id="execoPhoto" accept="image/*">
-              </label>
-              <label>…or paste an Image URL
-                <input type="url" id="execoPhotoUrl" placeholder="https://…">
-              </label>
-              <div class="preview-wrap" id="execoPreviewWrap" hidden>
-                <img id="execoPreview" alt="">
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-green" id="execoSubmit">Add Executive</button>
-                <button type="button" class="btn btn-ghost" id="execoCancel" hidden>Cancel Edit</button>
-              </div>
-              <p class="form-success" id="execoSuccess" hidden></p>
-              <p class="form-error" id="execoError" hidden></p>
-            </form>
-          </div>
-          <div class="admin-card">
-            <h3>Current Executives</h3>
-            <div class="admin-list" id="adminExecoList">
-              <p class="empty-state">Loading…</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- ============ BACK ARM ============ -->
+      <g transform="translate(101,151)">
+        <g class="arm phase2">
+          <rect class="anchor" x="-200" y="-200" width="400" height="400"/>
+          <rect x="-8" y="-8" width="16" height="66" rx="8" fill="#33579f"/>
+          <circle cx="0" cy="62" r="9.5" fill="#eec49b"/>
+        </g>
+      </g>
 
-      <!-- BOT -->
-      <div class="admin-tab-panel" id="tabBot" hidden>
-        <div class="admin-grid">
-          <div class="admin-card">
-            <h3>Add / Edit Trustee</h3>
-            <form class="stack-form" id="botForm" novalidate>
-              <input type="hidden" id="botEditId">
-              <label>Full Name
-                <input type="text" id="botName" required>
-              </label>
-              <label>Position
-                <input type="text" id="botRole" required>
-              </label>
-              <label>Display Order
-                <input type="number" id="botOrder" value="0" step="1">
-              </label>
-              <label>Upload Photo (≤ 500 KB recommended)
-                <input type="file" id="botPhoto" accept="image/*">
-              </label>
-              <label>…or paste an Image URL
-                <input type="url" id="botPhotoUrl" placeholder="https://…">
-              </label>
-              <div class="preview-wrap" id="botPreviewWrap" hidden>
-                <img id="botPreview" alt="">
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-green" id="botSubmit">Add Trustee</button>
-                <button type="button" class="btn btn-ghost" id="botCancel" hidden>Cancel Edit</button>
-              </div>
-              <p class="form-success" id="botSuccess" hidden></p>
-              <p class="form-error" id="botError" hidden></p>
-            </form>
-          </div>
-          <div class="admin-card">
-            <h3>Current Board Members</h3>
-            <div class="admin-list" id="adminBotList">
-              <p class="empty-state">Loading…</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COORDINATORS -->
-      <div class="admin-tab-panel" id="tabCoordinators" hidden>
-        <div class="admin-grid">
-          <div class="admin-card">
-            <h3>Add Coordinator</h3>
-            <form class="stack-form" id="coordForm" novalidate>
-              <label>Full Name
-                <input type="text" id="coordName" required>
-              </label>
-              <label>State
-                <select id="coordState" required></select>
-              </label>
-              <label>Local Government Area
-                <input type="text" id="coordLga" required>
-              </label>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-green" id="coordSubmit">Add Coordinator</button>
-                <button type="button" class="btn btn-outline-navy" id="coordSeed">Import Default Coordinators</button>
-              </div>
-              <p class="form-success" id="coordSuccess" hidden></p>
-              <p class="form-error" id="coordError" hidden></p>
-            </form>
-          </div>
-          <div class="admin-card">
-            <h3>Current Coordinators</h3>
-            <div class="admin-list" id="adminCoordList">
-              <p class="empty-state">Loading…</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- MEMBERS -->
-      <div class="admin-tab-panel" id="tabMembers" hidden>
-        <div class="admin-card">
-          <h3>Membership Registrations (<span id="membersCount">0</span>)</h3>
-          <div class="admin-members-toolbar">
-            <div class="search-wrap">
-              <i class="fa-solid fa-magnifying-glass"></i>
-              <input id="membersSearch" type="search" placeholder="Search by name, email or state…">
-            </div>
-            <button type="button" class="btn btn-outline-navy btn-small" id="membersDownloadCsv">
-              <i class="fa-solid fa-file-csv"></i>&nbsp;Download CSV
-            </button>
-          </div>
-          <div class="admin-list" id="adminMembersList">
-            <p class="empty-state">Loading…</p>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-top">
-        <div class="footer-brand">
-          <img src="logo.png" alt="TPA logo" class="footer-logo">
-          <span class="footer-title">TINUBU PROGRESSIVE ADVOCATES</span>
-        </div>
-        <div class="footer-address">
-          <i class="fa-solid fa-location-dot"></i>
-          <span>National Headquarters: Federal Capital Territory, Abuja, Nigeria</span>
-        </div>
-        <div class="footer-social">
-          <a href="mailto:tinubuprogressiveadvocates@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
-          <a href="https://x.com/OFFICIAL_TPADVO" target="_blank" rel="noopener" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
-          <a href="https://www.facebook.com/profile.php?id=61595682899896" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>© 2026 Tinubu Progressive Advocates. All rights reserved.</p>
-        <a href="admin.html" class="admin-link">Admin Panel</a>
-      </div>
-    </div>
-  </footer>
-
-  <script type="module" src="script.js"></script>
-</body>
-</html>
+      <!-- ============ BACK LEG ============ -->
+      <g transform="translate(109,212)">
+        <g class="leg">
+          <rect class="anchor" x="-200" y="-200" width="400" height="400"/>
+          <rect x="-11" y="-10" width="22" height="62" rx="11" fill="url(#pantsGrad)"/>
+          <
