@@ -3,18 +3,17 @@ import {
   collection, query, orderBy, limit, getDocs, addDoc, doc,
   updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { NIGERIAN_LGAS } from './lga-data.js';
 
 /* ---------------------------------------------------------------------------
-   Cloudinary configuration — fill these two values from your Cloudinary console
+   Cloudinary config — fill in from your Cloudinary console
    --------------------------------------------------------------------------- */
-
-const CLOUDINARY_CLOUD_NAME    = 'th1ixgex';      // e.g. 'dxxxxxx'
-const CLOUDINARY_UPLOAD_PRESET = 'tpa_unsigned';   // e.g. 'tpa_unsigned'
+const CLOUDINARY_CLOUD_NAME    = 'th1ixgex';
+const CLOUDINARY_UPLOAD_PRESET = 'tpa_unsigned';
 
 /* ---------------------------------------------------------------------------
    Constants
    --------------------------------------------------------------------------- */
-
 export const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
   'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu',
@@ -23,14 +22,13 @@ export const NIGERIAN_STATES = [
   'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
   'Federal Capital Territory'
 ];
+export { NIGERIAN_LGAS };
 
-/** Valid keys for the site_settings/{"roleKey"} leadership documents */
 const LEADERSHIP_ROLES = ['national_leader', 'custodian'];
 
 /* ---------------------------------------------------------------------------
    Helpers
    --------------------------------------------------------------------------- */
-
 function toISO(ts) {
   if (!ts) return null;
   if (typeof ts === 'string') return ts;
@@ -40,10 +38,71 @@ function toISO(ts) {
   return null;
 }
 
+/* ---------- sessionStorage cache ---------- */
+const CACHE_PREFIX = 'tpa-cache:';
+
+function cached(key, ttlMs, fetchFn) {
+  const fullKey = CACHE_PREFIX + key;
+  const now = Date.now();
+  try {
+    const raw = sessionStorage.getItem(fullKey);
+    if (raw) {
+      const { t, v } = JSON.parse(raw);
+      if (now - t < ttlMs) return Promise.resolve(v);
+    }
+  } catch { /* ignore */ }
+  return fetchFn().then(v => {
+    try { sessionStorage.setItem(fullKey, JSON.stringify({ t: now, v })); } catch { /* quota */ }
+    return v;
+  });
+}
+
+export function clearCache(prefix) {
+  try {
+    const target = CACHE_PREFIX + prefix;
+    Object.keys(sessionStorage)
+      .filter(k => k.startsWith(target))
+      .forEach(k => sessionStorage.removeItem(k));
+  } catch { /* ignore */ }
+}
+
+/* ---------------------------------------------------------------------------
+   Cloudinary URL helpers — bandwidth savers
+   --------------------------------------------------------------------------- */
+
+/**
+ * Wrap a Cloudinary delivery URL with on-the-fly transformations.
+ * Non-Cloudinary URLs are returned unchanged.
+ */
+export function cloudinaryUrl(url, opts = {}) {
+  if (!url || typeof url !== 'string') return url || '';
+  const m = url.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+  if (!m) return url;
+
+  const {
+    width = 400, height = null, crop = 'limit', gravity = 'auto',
+    quality = 'auto', format = 'auto', dpr = true, blur = null
+  } = opts;
+
+  const parts = [`f_${format}`, `q_${quality}`];
+  if (width) parts.push(`w_${width}`);
+  if (height) parts.push(`h_${height}`);
+  if (crop) parts.push(`c_${crop}`);
+  if (gravity && crop === 'fill') parts.push(`g_${gravity}`);
+  if (dpr) parts.push('dpr_auto');
+  if (blur != null) parts.push(`e_blur:${blur}`);
+
+  return m[1] + parts.join(',') + '/' + m[2];
+}
+
+export function cloudinaryLqip(url) {
+  if (!url || !url.includes('res.cloudinary.com')) return '';
+  return cloudinaryUrl(url, { width: 30, blur: 1000, dpr: false, crop: null });
+}
+
 /* ---------------------------------------------------------------------------
    News
    --------------------------------------------------------------------------- */
-
 function mapNews(d) {
   const data = d.data();
   return {
@@ -59,18 +118,22 @@ function mapNews(d) {
 }
 
 export async function fetchNews(max = null) {
-  const constraints = [orderBy('date', 'desc'), orderBy('createdAt', 'desc')];
-  if (max) constraints.push(limit(max));
-  const q = query(collection(db, 'news'), ...constraints);
-  const snap = await getDocs(q);
-  return snap.docs.map(mapNews);
+  const key = `news:${max || 'all'}`;
+  return cached(key, 5 * 60 * 1000, async () => {
+    const constraints = [orderBy('date', 'desc'), orderBy('createdAt', 'desc')];
+    if (max) constraints.push(limit(max));
+    const snap = await getDocs(query(collection(db, 'news'), ...constraints));
+    return snap.docs.map(mapNews);
+  });
 }
 
 export async function fetchNewsById(id) {
   if (!id) return null;
-  const snap = await getDoc(doc(db, 'news', id));
-  if (!snap.exists()) return null;
-  return mapNews(snap);
+  return cached(`newsById:${id}`, 5 * 60 * 1000, async () => {
+    const snap = await getDoc(doc(db, 'news', id));
+    if (!snap.exists()) return null;
+    return mapNews(snap);
+  });
 }
 
 export async function createNews(newsData) {
@@ -84,6 +147,7 @@ export async function createNews(newsData) {
     updatedAt: serverTimestamp()
   };
   const refDoc = await addDoc(collection(db, 'news'), payload);
+  clearCache('news');
   return refDoc.id;
 }
 
@@ -97,17 +161,17 @@ export async function updateNews(id, newsData) {
     updatedAt: serverTimestamp()
   };
   await updateDoc(doc(db, 'news', id), payload);
+  clearCache('news');
 }
 
 export async function deleteNews(id) {
   await deleteDoc(doc(db, 'news', id));
+  clearCache('news');
 }
 
 /* ---------------------------------------------------------------------------
-   Site leadership — single, fixed documents in site_settings
-   ("national_leader" and "custodian"). Both use the same shape.
+   Site leadership (national_leader, custodian)
    --------------------------------------------------------------------------- */
-
 function mapLeadership(data) {
   return {
     name: data.name || '',
@@ -118,23 +182,15 @@ function mapLeadership(data) {
   };
 }
 
-/**
- * Load one of the fixed leadership slots.
- * @param {'national_leader'|'custodian'} roleKey
- * @returns {Promise<{name,role,photoUrl,photoPath,photoDeleteToken}|null>}
- */
 export async function fetchLeadership(roleKey) {
   if (!LEADERSHIP_ROLES.includes(roleKey)) return null;
-  const snap = await getDoc(doc(db, 'site_settings', roleKey));
-  if (!snap.exists()) return null;
-  return mapLeadership(snap.data());
+  return cached(`leadership:${roleKey}`, 5 * 60 * 1000, async () => {
+    const snap = await getDoc(doc(db, 'site_settings', roleKey));
+    if (!snap.exists()) return null;
+    return mapLeadership(snap.data());
+  });
 }
 
-/**
- * Save one of the fixed leadership slots.
- * Creates the document on first save, updates it thereafter.
- * @param {'national_leader'|'custodian'} roleKey
- */
 export async function updateLeadership(roleKey, payload) {
   if (!LEADERSHIP_ROLES.includes(roleKey)) {
     throw new Error('Unknown leadership role: ' + roleKey);
@@ -148,12 +204,12 @@ export async function updateLeadership(roleKey, payload) {
     updatedAt: serverTimestamp()
   };
   await setDoc(doc(db, 'site_settings', roleKey), clean, { merge: true });
+  clearCache('leadership');
 }
 
 /* ---------------------------------------------------------------------------
    National Execos
    --------------------------------------------------------------------------- */
-
 function mapExeco(d) {
   const data = d.data();
   return {
@@ -169,15 +225,17 @@ function mapExeco(d) {
 }
 
 export async function fetchNationalExecos() {
-  const snap = await getDocs(collection(db, 'national_execos'));
-  const items = snap.docs.map(mapExeco);
-  items.sort((a, b) => {
-    const ao = Number(a.displayOrder) || 0;
-    const bo = Number(b.displayOrder) || 0;
-    if (ao !== bo) return ao - bo;
-    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  return cached('execos', 5 * 60 * 1000, async () => {
+    const snap = await getDocs(collection(db, 'national_execos'));
+    const items = snap.docs.map(mapExeco);
+    items.sort((a, b) => {
+      const ao = Number(a.displayOrder) || 0;
+      const bo = Number(b.displayOrder) || 0;
+      if (ao !== bo) return ao - bo;
+      return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    });
+    return items;
   });
-  return items;
 }
 
 export async function createExeco(execoData) {
@@ -191,6 +249,7 @@ export async function createExeco(execoData) {
     createdAt: serverTimestamp()
   };
   const refDoc = await addDoc(collection(db, 'national_execos'), payload);
+  clearCache('execos');
   return refDoc.id;
 }
 
@@ -204,12 +263,14 @@ export async function updateExeco(id, execoData) {
     displayOrder: Number(execoData.displayOrder) || 0
   };
   await updateDoc(doc(db, 'national_execos', id), payload);
+  clearCache('execos');
 }
 
 export async function updateExecoOrder(id, displayOrder) {
   await updateDoc(doc(db, 'national_execos', id), {
     displayOrder: Number(displayOrder) || 0
   });
+  clearCache('execos');
 }
 
 export async function deleteExeco(id) {
@@ -219,15 +280,15 @@ export async function deleteExeco(id) {
   const publicId = data.photoPath || null;
   const deleteToken = data.photoDeleteToken || null;
   await deleteDoc(docRef);
+  clearCache('execos');
   if (publicId && deleteToken) {
     await deleteCloudinaryImage(publicId, deleteToken);
   }
 }
 
 /* ---------------------------------------------------------------------------
-   Board of Trustees — same shape as National Execos
+   Board of Trustees
    --------------------------------------------------------------------------- */
-
 function mapTrustee(d) {
   const data = d.data();
   return {
@@ -243,15 +304,17 @@ function mapTrustee(d) {
 }
 
 export async function fetchBoardOfTrustees() {
-  const snap = await getDocs(collection(db, 'board_of_trustees'));
-  const items = snap.docs.map(mapTrustee);
-  items.sort((a, b) => {
-    const ao = Number(a.displayOrder) || 0;
-    const bo = Number(b.displayOrder) || 0;
-    if (ao !== bo) return ao - bo;
-    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  return cached('bot', 5 * 60 * 1000, async () => {
+    const snap = await getDocs(collection(db, 'board_of_trustees'));
+    const items = snap.docs.map(mapTrustee);
+    items.sort((a, b) => {
+      const ao = Number(a.displayOrder) || 0;
+      const bo = Number(b.displayOrder) || 0;
+      if (ao !== bo) return ao - bo;
+      return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    });
+    return items;
   });
-  return items;
 }
 
 export async function createTrustee(trusteeData) {
@@ -265,6 +328,7 @@ export async function createTrustee(trusteeData) {
     createdAt: serverTimestamp()
   };
   const refDoc = await addDoc(collection(db, 'board_of_trustees'), payload);
+  clearCache('bot');
   return refDoc.id;
 }
 
@@ -278,12 +342,14 @@ export async function updateTrustee(id, trusteeData) {
     displayOrder: Number(trusteeData.displayOrder) || 0
   };
   await updateDoc(doc(db, 'board_of_trustees', id), payload);
+  clearCache('bot');
 }
 
 export async function updateTrusteeOrder(id, displayOrder) {
   await updateDoc(doc(db, 'board_of_trustees', id), {
     displayOrder: Number(displayOrder) || 0
   });
+  clearCache('bot');
 }
 
 export async function deleteTrustee(id) {
@@ -293,15 +359,15 @@ export async function deleteTrustee(id) {
   const publicId = data.photoPath || null;
   const deleteToken = data.photoDeleteToken || null;
   await deleteDoc(docRef);
+  clearCache('bot');
   if (publicId && deleteToken) {
     await deleteCloudinaryImage(publicId, deleteToken);
   }
 }
 
 /* ---------------------------------------------------------------------------
-   Patrons — same shape as Board of Trustees
+   Patrons
    --------------------------------------------------------------------------- */
-
 function mapPatron(d) {
   const data = d.data();
   return {
@@ -317,15 +383,17 @@ function mapPatron(d) {
 }
 
 export async function fetchPatrons() {
-  const snap = await getDocs(collection(db, 'patrons'));
-  const items = snap.docs.map(mapPatron);
-  items.sort((a, b) => {
-    const ao = Number(a.displayOrder) || 0;
-    const bo = Number(b.displayOrder) || 0;
-    if (ao !== bo) return ao - bo;
-    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  return cached('patrons', 5 * 60 * 1000, async () => {
+    const snap = await getDocs(collection(db, 'patrons'));
+    const items = snap.docs.map(mapPatron);
+    items.sort((a, b) => {
+      const ao = Number(a.displayOrder) || 0;
+      const bo = Number(b.displayOrder) || 0;
+      if (ao !== bo) return ao - bo;
+      return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    });
+    return items;
   });
-  return items;
 }
 
 export async function createPatron(patronData) {
@@ -339,6 +407,7 @@ export async function createPatron(patronData) {
     createdAt: serverTimestamp()
   };
   const refDoc = await addDoc(collection(db, 'patrons'), payload);
+  clearCache('patrons');
   return refDoc.id;
 }
 
@@ -352,12 +421,14 @@ export async function updatePatron(id, patronData) {
     displayOrder: Number(patronData.displayOrder) || 0
   };
   await updateDoc(doc(db, 'patrons', id), payload);
+  clearCache('patrons');
 }
 
 export async function updatePatronOrder(id, displayOrder) {
   await updateDoc(doc(db, 'patrons', id), {
     displayOrder: Number(displayOrder) || 0
   });
+  clearCache('patrons');
 }
 
 export async function deletePatron(id) {
@@ -367,6 +438,7 @@ export async function deletePatron(id) {
   const publicId = data.photoPath || null;
   const deleteToken = data.photoDeleteToken || null;
   await deleteDoc(docRef);
+  clearCache('patrons');
   if (publicId && deleteToken) {
     await deleteCloudinaryImage(publicId, deleteToken);
   }
@@ -375,7 +447,6 @@ export async function deletePatron(id) {
 /* ---------------------------------------------------------------------------
    State Coordinators
    --------------------------------------------------------------------------- */
-
 function mapCoord(d) {
   const data = d.data();
   return {
@@ -388,14 +459,16 @@ function mapCoord(d) {
 }
 
 export async function fetchStateCoordinators() {
-  const snap = await getDocs(collection(db, 'state_coordinators'));
-  const items = snap.docs.map(mapCoord);
-  items.sort((a, b) => {
-    const s = a.state.localeCompare(b.state);
-    if (s !== 0) return s;
-    return a.name.localeCompare(b.name);
+  return cached('coordinators', 5 * 60 * 1000, async () => {
+    const snap = await getDocs(collection(db, 'state_coordinators'));
+    const items = snap.docs.map(mapCoord);
+    items.sort((a, b) => {
+      const s = a.state.localeCompare(b.state);
+      if (s !== 0) return s;
+      return a.name.localeCompare(b.name);
+    });
+    return items;
   });
-  return items;
 }
 
 export async function createCoordinator(coordData) {
@@ -406,11 +479,13 @@ export async function createCoordinator(coordData) {
     createdAt: serverTimestamp()
   };
   const refDoc = await addDoc(collection(db, 'state_coordinators'), payload);
+  clearCache('coordinators');
   return refDoc.id;
 }
 
 export async function deleteCoordinator(id) {
   await deleteDoc(doc(db, 'state_coordinators', id));
+  clearCache('coordinators');
 }
 
 export async function seedCoordinators(list) {
@@ -421,10 +496,7 @@ export async function seedCoordinators(list) {
   const summary = { added: 0, skipped: 0, errors: [] };
   for (const c of list) {
     const key = `${c.name.trim().toLowerCase()}|${c.state.trim().toLowerCase()}`;
-    if (existingKeys.has(key)) {
-      summary.skipped++;
-      continue;
-    }
+    if (existingKeys.has(key)) { summary.skipped++; continue; }
     try {
       await createCoordinator({ name: c.name, state: c.state, lga: c.lga });
       summary.added++;
@@ -436,9 +508,8 @@ export async function seedCoordinators(list) {
 }
 
 /* ---------------------------------------------------------------------------
-   Members
+   Members — with LGA
    --------------------------------------------------------------------------- */
-
 function mapMember(d) {
   const data = d.data();
   return {
@@ -447,6 +518,7 @@ function mapMember(d) {
     email: data.email || '',
     phone: data.phone || '',
     state: data.state || '',
+    lga: data.lga || '',
     status: data.status || 'pending',
     createdAt: toISO(data.createdAt)
   };
@@ -458,6 +530,7 @@ export async function createMember(memberData) {
     email: memberData.email,
     phone: memberData.phone,
     state: memberData.state,
+    lga: memberData.lga,
     status: 'pending',
     createdAt: serverTimestamp()
   };
@@ -481,9 +554,8 @@ export async function deleteMember(id) {
 }
 
 /* ---------------------------------------------------------------------------
-   Auth / roles
+   Auth
    --------------------------------------------------------------------------- */
-
 export async function checkAdmin(user) {
   if (!user) return false;
   const snap = await getDoc(doc(db, 'user_roles', user.uid));
@@ -492,35 +564,28 @@ export async function checkAdmin(user) {
 }
 
 /* ---------------------------------------------------------------------------
-   Media — Cloudinary
+   Cloudinary media
    --------------------------------------------------------------------------- */
-
 async function resizeImage(file, maxDim = 800, quality = 0.85) {
   if (file.type === 'image/gif') return file;
-
   return new Promise((resolve) => {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
-
     img.onload = () => {
       URL.revokeObjectURL(blobUrl);
       const { width, height } = img;
       if (width <= maxDim && height <= maxDim) { resolve(file); return; }
-
       const ratio = Math.min(maxDim / width, maxDim / height);
       const newW = Math.round(width * ratio);
       const newH = Math.round(height * ratio);
-
       const canvas = document.createElement('canvas');
       canvas.width = newW;
       canvas.height = newH;
-
       const ctx = canvas.getContext('2d');
       if (!ctx) { resolve(file); return; }
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, newW, newH);
-
       canvas.toBlob((blob) => {
         if (!blob) { resolve(file); return; }
         const baseName = file.name.replace(/\.\w+$/, '') || 'photo';
@@ -531,12 +596,7 @@ async function resizeImage(file, maxDim = 800, quality = 0.85) {
         resolve(resized.size < file.size ? resized : file);
       }, 'image/jpeg', quality);
     };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      resolve(file);
-    };
-
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(file); };
     img.src = blobUrl;
   });
 }
@@ -548,21 +608,16 @@ export async function uploadToStorage(file) {
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('Image must be smaller than 5 MB.');
   }
-
   const toUpload = await resizeImage(file, 800, 0.85);
-
   const formData = new FormData();
   formData.append('file', toUpload);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
   const res = await fetch(url, { method: 'POST', body: formData });
-
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(`Cloudinary upload failed (${res.status}): ${errText}`);
   }
-
   const data = await res.json();
   return {
     url: data.secure_url,
@@ -577,10 +632,8 @@ export async function deleteStorageFile(publicId, deleteToken) {
     const formData = new FormData();
     formData.append('public_id', publicId);
     formData.append('token', deleteToken);
-
     const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/delete_by_token`;
     const res = await fetch(url, { method: 'POST', body: formData });
-
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.warn(`Cloudinary delete failed (${res.status}) for "${publicId}":`, body);

@@ -1,9 +1,6 @@
 /* =========================================================
    TPA — page controller
-   Reads document.body.dataset.page and initialises the right renderer.
-   Media uploads go to Cloudinary (unsigned preset); other data to Firestore.
    ========================================================= */
-
 import { auth } from './firebase-config.js';
 import {
   onAuthStateChanged,
@@ -14,13 +11,13 @@ import * as data from './data-service.js';
 import { DEFAULT_COORDINATORS } from './seed-data.js';
 
 const NIGERIAN_STATES = data.NIGERIAN_STATES;
+const NIGERIAN_LGAS   = data.NIGERIAN_LGAS;
 const page = document.body.dataset.page;
 const ORIGINAL_TITLE = document.title;
 
 /* ---------------------------------------------------------
    Utilities
    --------------------------------------------------------- */
-
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str)
@@ -73,34 +70,24 @@ function friendlyAuthError(err) {
   switch (code) {
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
-    case 'auth/user-not-found':
-      return 'Invalid email or password.';
-    case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
-    case 'auth/too-many-requests':
-      return 'Too many failed attempts. Please try again later.';
-    case 'auth/invalid-api-key':
-      return 'Authentication is not configured correctly. Check firebase-config.js.';
-    case 'auth/network-request-failed':
-      return 'Network error. Please check your connection and try again.';
-    default:
-      return (err && err.message) ? err.message : 'Sign in failed.';
+    case 'auth/user-not-found':       return 'Invalid email or password.';
+    case 'auth/invalid-email':        return 'Please enter a valid email address.';
+    case 'auth/too-many-requests':    return 'Too many failed attempts. Please try again later.';
+    case 'auth/invalid-api-key':      return 'Authentication is not configured correctly.';
+    case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
+    default:                          return (err && err.message) ? err.message : 'Sign in failed.';
   }
 }
 
 /* ---------- CSV ---------- */
-
-function csvEscape(value) {
-  const s = String(value == null ? '' : value);
-  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-  return s;
+function csvEscape(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-
 function downloadCSV(filename, headers, rows) {
   const lines = [headers.map(csvEscape).join(',')];
   for (const row of rows) lines.push(row.map(csvEscape).join(','));
-  const csv = '\uFEFF' + lines.join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -112,7 +99,6 @@ function downloadCSV(filename, headers, rows) {
 }
 
 /* ---------- Scroll reveal ---------- */
-
 function observeFadeUps(root = document) {
   const els = root.querySelectorAll ? root.querySelectorAll('.fade-up:not(.visible)') : [];
   if (!els.length) return;
@@ -131,10 +117,48 @@ function observeFadeUps(root = document) {
   els.forEach(el => io.observe(el));
 }
 
+/* ---------- Blur-up image loader (delegated) ---------- */
+function initImageLoader() {
+  document.addEventListener('load', (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && img.closest('.img-blur')) {
+      img.classList.add('loaded');
+    }
+  }, true);
+}
+
+/* ---------- Skeletons ---------- */
+function skeletonPersonCards(count = 4) {
+  return Array.from({ length: count }, () => `
+    <article class="skeleton-card">
+      <div class="skeleton skeleton-photo"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line short"></div>
+    </article>`).join('');
+}
+
+function skeletonNewsCards(count = 3) {
+  return Array.from({ length: count }, () => `
+    <article class="skeleton-card">
+      <div class="skeleton skeleton-line short" style="margin-bottom:16px;"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line short"></div>
+    </article>`).join('');
+}
+
+function skeletonTableRows(count = 5) {
+  return Array.from({ length: count }, () => `
+    <tr>
+      <td><div class="skeleton skeleton-line" style="margin:0;"></div></td>
+      <td><div class="skeleton skeleton-line" style="margin:0;"></div></td>
+      <td><div class="skeleton skeleton-line" style="margin:0;"></div></td>
+    </tr>`).join('');
+}
+
 /* ---------------------------------------------------------
    Shared init
    --------------------------------------------------------- */
-
 function initNav() {
   const toggle = document.getElementById('menuToggle');
   const links = document.getElementById('navLinks');
@@ -144,6 +168,13 @@ function initNav() {
     if (a.dataset.nav === page) a.classList.add('active');
     a.addEventListener('click', () => links.classList.remove('open'));
   });
+
+  const header = document.querySelector('.site-header');
+  if (header) {
+    const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 24);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
 }
 
 function initAnimations() { observeFadeUps(document); }
@@ -151,18 +182,17 @@ function initAnimations() { observeFadeUps(document); }
 /* ---------------------------------------------------------
    Home — featured news
    --------------------------------------------------------- */
-
 async function renderHomeNews() {
   const container = document.getElementById('featuredNewsContainer');
   if (!container) return;
-  container.innerHTML = '<p class="empty-state">Loading…</p>';
+  container.innerHTML = skeletonNewsCards(3);
   try {
     const articles = await data.fetchNews(3);
     if (!articles.length) {
       container.innerHTML = '<p class="empty-state">No news articles have been published yet.</p>';
       return;
     }
-    container.innerHTML = articles.map(newsCardHtml).join('');
+    container.innerHTML = articles.map((a, i) => newsCardHtml(a, i)).join('');
     observeFadeUps(container);
   } catch (err) {
     console.error(err);
@@ -170,9 +200,9 @@ async function renderHomeNews() {
   }
 }
 
-function newsCardHtml(a) {
+function newsCardHtml(a, i = 0) {
   return `
-    <article class="news-card fade-up">
+    <article class="news-card fade-up" style="--i:${i}">
       <div class="news-meta">
         <span class="news-date">${escapeHtml(formatDate(a.date))}</span>
         <span class="news-category">${escapeHtml(a.category)}</span>
@@ -186,7 +216,6 @@ function newsCardHtml(a) {
 /* ---------------------------------------------------------
    News page
    --------------------------------------------------------- */
-
 async function renderNewsPage() {
   const listView    = document.getElementById('newsListView');
   const list        = document.getElementById('newsList');
@@ -199,7 +228,13 @@ async function renderNewsPage() {
   if (articleId) {
     listView.hidden = true;
     articleView.hidden = false;
-    articleView.innerHTML = '<p class="empty-state">Loading article…</p>';
+    articleView.innerHTML = `
+      <div class="skeleton skeleton-line short" style="margin-bottom:24px;"></div>
+      <div class="skeleton skeleton-line" style="height:36px;width:85%;margin-bottom:12px;"></div>
+      <div class="skeleton skeleton-line" style="height:36px;width:60%;margin-bottom:28px;"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line short"></div>`;
     try {
       const article = await data.fetchNewsById(articleId);
       renderArticleView(articleView, article);
@@ -216,7 +251,7 @@ async function renderNewsPage() {
   listView.hidden = false;
   articleView.hidden = true;
   document.title = ORIGINAL_TITLE;
-  list.innerHTML = '<p class="empty-state">Loading…</p>';
+  list.innerHTML = skeletonNewsCards(6);
 
   let articles = [];
   try {
@@ -230,8 +265,8 @@ async function renderNewsPage() {
     list.innerHTML = '<p class="empty-state">No news articles have been published yet.</p>';
     return;
   }
-  list.innerHTML = articles.map(a => `
-    <article class="news-card fade-up">
+  list.innerHTML = articles.map((a, i) => `
+    <article class="news-card fade-up" style="--i:${i}">
       <div class="news-meta">
         <span class="news-date">${escapeHtml(formatDate(a.date))}</span>
         <span class="news-category">${escapeHtml(a.category)}</span>
@@ -270,28 +305,10 @@ function renderArticleView(container, article) {
 /* ---------------------------------------------------------
    Executives page
    --------------------------------------------------------- */
-
-/**
- * Overlay a leadership slot with data from Firestore.
- * Falls back to whatever is hardcoded in the HTML if nothing
- * exists in Firestore yet — so the page is never blank.
- */
 async function renderLeadership() {
   const slots = [
-    {
-      key: 'national_leader',
-      nameId: 'nationalLeaderName',
-      roleId: 'nationalLeaderRole',
-      imgId: 'nationalLeaderPhoto',
-      fallbackId: 'nationalLeaderPhotoFallback'
-    },
-    {
-      key: 'custodian',
-      nameId: 'custodianName',
-      roleId: 'custodianRole',
-      imgId: 'custodianPhoto',
-      fallbackId: 'custodianPhotoFallback'
-    }
+    { key: 'national_leader', nameId: 'nationalLeaderName', roleId: 'nationalLeaderRole', imgId: 'nationalLeaderPhoto', fallbackId: 'nationalLeaderPhotoFallback' },
+    { key: 'custodian',       nameId: 'custodianName',       roleId: 'custodianRole',       imgId: 'custodianPhoto',       fallbackId: 'custodianPhotoFallback' }
   ];
 
   for (const slot of slots) {
@@ -303,13 +320,11 @@ async function renderLeadership() {
 
     try {
       const info = await data.fetchLeadership(slot.key);
-      if (!info) continue;   // no Firestore doc → keep the hardcoded defaults
-
+      if (!info) continue;
       if (info.name) nameEl.textContent = info.name;
       if (info.role && roleEl) roleEl.textContent = info.role;
-
       if (info.photoUrl) {
-        imgEl.src = info.photoUrl;
+        imgEl.src = data.cloudinaryUrl(info.photoUrl, { width: 360 });
         imgEl.hidden = false;
         if (fallbackEl) fallbackEl.hidden = true;
       } else {
@@ -322,7 +337,6 @@ async function renderLeadership() {
       }
     } catch (err) {
       console.error('Could not load leadership slot', slot.key, err);
-      /* Silently keep the hardcoded defaults */
     }
   }
 }
@@ -330,14 +344,14 @@ async function renderLeadership() {
 async function renderPatrons() {
   const grid = document.getElementById('patronsGrid');
   if (!grid) return;
-  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  grid.innerHTML = skeletonPersonCards(3);
   try {
     const list = await data.fetchPatrons();
     if (!list.length) {
       grid.innerHTML = '<p class="empty-state">Patron profiles will appear here once published.</p>';
       return;
     }
-    grid.innerHTML = list.map(cardHtmlForPerson).join('');
+    grid.innerHTML = list.map((x, i) => cardHtmlForPerson(x, i)).join('');
     observeFadeUps(grid);
   } catch (err) {
     console.error(err);
@@ -348,14 +362,14 @@ async function renderPatrons() {
 async function renderExecutives() {
   const grid = document.getElementById('execGrid');
   if (!grid) return;
-  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  grid.innerHTML = skeletonPersonCards(4);
   try {
     const execos = await data.fetchNationalExecos();
     if (!execos.length) {
       grid.innerHTML = '<p class="empty-state">Executive profiles will appear here once published.</p>';
       return;
     }
-    grid.innerHTML = execos.map(cardHtmlForPerson).join('');
+    grid.innerHTML = execos.map((x, i) => cardHtmlForPerson(x, i)).join('');
     observeFadeUps(grid);
   } catch (err) {
     console.error(err);
@@ -366,14 +380,14 @@ async function renderExecutives() {
 async function renderBoardOfTrustees() {
   const grid = document.getElementById('botGrid');
   if (!grid) return;
-  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  grid.innerHTML = skeletonPersonCards(3);
   try {
     const list = await data.fetchBoardOfTrustees();
     if (!list.length) {
       grid.innerHTML = '<p class="empty-state">Board of Trustees profiles will appear here once published.</p>';
       return;
     }
-    grid.innerHTML = list.map(cardHtmlForPerson).join('');
+    grid.innerHTML = list.map((x, i) => cardHtmlForPerson(x, i)).join('');
     observeFadeUps(grid);
   } catch (err) {
     console.error(err);
@@ -381,13 +395,22 @@ async function renderBoardOfTrustees() {
   }
 }
 
-function cardHtmlForPerson(x) {
+function cardHtmlForPerson(x, i = 0) {
   const initials = getInitials(x.name);
+  const full = x.photoUrl ? data.cloudinaryUrl(x.photoUrl, { width: 400 }) : '';
+  const blur = x.photoUrl ? data.cloudinaryLqip(x.photoUrl) : '';
+  const useBlur = blur && blur !== x.photoUrl;
+  const bgStyle = useBlur ? `style="background-image:url('${escapeHtml(blur)}')"` : '';
   const photo = x.photoUrl
-    ? `<div class="exec-photo"><img src="${escapeHtml(x.photoUrl)}" alt="${escapeHtml(x.name)}" loading="lazy"></div>`
+    ? `<div class="exec-photo img-blur" ${bgStyle}>
+         <img src="${escapeHtml(full)}"
+              alt="${escapeHtml(x.name)}"
+              width="400" height="400"
+              loading="lazy" decoding="async">
+       </div>`
     : `<div class="exec-photo exec-photo-initials">${escapeHtml(initials)}</div>`;
   return `
-    <article class="exec-card fade-up">
+    <article class="exec-card fade-up" style="--i:${i}">
       ${photo}
       <h3>${escapeHtml(x.name)}</h3>
       <p class="exec-role">${escapeHtml(x.role)}</p>
@@ -395,30 +418,31 @@ function cardHtmlForPerson(x) {
 }
 
 async function renderCoordinators() {
-  const grid = document.getElementById('coordGrid');
+  const tbody = document.getElementById('coordTbody');
+  const wrap = document.getElementById('coordTableWrap');
   const empty = document.getElementById('coordEmpty');
   const search = document.getElementById('coordSearch');
-  if (!grid) return;
+  if (!tbody || !wrap) return;
 
-  grid.innerHTML = '<p class="empty-state">Loading…</p>';
+  wrap.hidden = false;
   if (empty) empty.hidden = true;
+  tbody.innerHTML = skeletonTableRows(5);
 
   let coords = [];
   try {
     coords = await data.fetchStateCoordinators();
   } catch (err) {
     console.error(err);
-    grid.innerHTML = '';
+    tbody.innerHTML = '';
+    wrap.hidden = true;
     if (empty) { empty.hidden = false; empty.textContent = 'Could not load coordinators.'; }
     return;
   }
 
-  const svgPin = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
-  const svgMap = `<svg class="coord-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`;
-
-  function renderCards(items, animate = false) {
+  function renderTable(items) {
     if (!items.length) {
-      grid.innerHTML = '';
+      tbody.innerHTML = '';
+      wrap.hidden = true;
       if (empty) {
         empty.hidden = false;
         empty.textContent = coords.length
@@ -427,55 +451,67 @@ async function renderCoordinators() {
       }
       return;
     }
+    wrap.hidden = false;
     if (empty) empty.hidden = true;
-    grid.innerHTML = items.map(c => `
-      <article class="coord-card ${animate ? 'fade-up' : ''}">
-        <div class="coord-card-avatar">${escapeHtml(getInitials(c.name))}</div>
-        <h3 class="coord-card-name">${escapeHtml(c.name)}</h3>
-        <div class="coord-card-badges">
-          <span class="coord-badge coord-badge-state">
-            ${svgPin}
-            ${escapeHtml(c.state)}
-          </span>
-        </div>
-        <div class="coord-card-lga">
-          ${svgMap}
-          <span>${escapeHtml(c.lga)}</span>
-        </div>
-      </article>
+    tbody.innerHTML = items.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(c.state)}</td>
+        <td>${escapeHtml(c.lga)}</td>
+      </tr>
     `).join('');
-    if (animate) observeFadeUps(grid);
   }
 
-  renderCards(coords, true);
+  renderTable(coords);
 
   if (search) {
     search.addEventListener('input', () => {
       const q = search.value.trim().toLowerCase();
-      if (!q) { renderCards(coords, false); return; }
+      if (!q) { renderTable(coords); return; }
       const filtered = coords.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.state.toLowerCase().includes(q) ||
         c.lga.toLowerCase().includes(q)
       );
-      renderCards(filtered, false);
+      renderTable(filtered);
     });
   }
 }
 
 /* ---------------------------------------------------------
-   Membership form
+   Membership form (with LGA)
    --------------------------------------------------------- */
-
 async function initMembershipForm() {
   const form = document.getElementById('membershipForm');
   const stateSel = document.getElementById('memberState');
-  if (!form || !stateSel) return;
+  const lgaSel = document.getElementById('memberLga');
+  if (!form || !stateSel || !lgaSel) return;
 
   if (!stateSel.options.length) {
     stateSel.innerHTML = '<option value="">Select your state…</option>' +
       NIGERIAN_STATES.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   }
+
+  lgaSel.innerHTML = '<option value="">Select your state first…</option>';
+  lgaSel.disabled = true;
+
+  stateSel.addEventListener('change', () => {
+    const state = stateSel.value;
+    if (!state) {
+      lgaSel.innerHTML = '<option value="">Select your state first…</option>';
+      lgaSel.disabled = true;
+      return;
+    }
+    const lgas = NIGERIAN_LGAS[state] || [];
+    if (!lgas.length) {
+      lgaSel.innerHTML = '<option value="">No LGAs available</option>';
+      lgaSel.disabled = true;
+      return;
+    }
+    lgaSel.disabled = false;
+    lgaSel.innerHTML = '<option value="">Select your LGA…</option>' +
+      lgas.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  });
 
   const submitBtn = form.querySelector('button[type="submit"]');
   const originalLabel = submitBtn ? submitBtn.textContent : 'Submit Registration';
@@ -486,14 +522,20 @@ async function initMembershipForm() {
     const email = form.querySelector('[name="email"]').value.trim();
     const phone = form.querySelector('[name="phone"]').value.trim();
     const state = stateSel.value;
+    const lga = lgaSel.value;
 
-    if (!name || !email || !phone || !state) { alert('Please fill in all fields.'); return; }
+    if (!name || !email || !phone || !state || !lga) {
+      alert('Please fill in all fields.');
+      return;
+    }
 
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
     try {
-      await data.createMember({ fullName: name, email, phone, state });
-      alert(`Thank you, ${name}! Your registration for ${state} has been received. Your State Coordinator will be in touch to confirm.`);
+      await data.createMember({ fullName: name, email, phone, state, lga });
+      alert(`Thank you, ${name}! Your registration for ${lga}, ${state} has been received. Your State Coordinator will be in touch to confirm.`);
       form.reset();
+      lgaSel.innerHTML = '<option value="">Select your state first…</option>';
+      lgaSel.disabled = true;
     } catch (err) {
       console.error(err);
       alert('Sorry — we could not submit your registration right now. Please try again in a moment.');
@@ -506,7 +548,6 @@ async function initMembershipForm() {
 /* ---------------------------------------------------------
    Admin panel
    --------------------------------------------------------- */
-
 function initAdmin() {
   const gate = document.getElementById('adminGate');
   const denied = document.getElementById('adminDenied');
@@ -524,7 +565,6 @@ function initAdmin() {
   const panelEmail    = document.getElementById('panelEmail');
   const panelSignOut  = document.getElementById('panelSignOut');
 
-  /* --- Tabs --- */
   const tabs = Array.from(document.querySelectorAll('.admin-tab'));
   const panels = {
     news:         document.getElementById('tabNews'),
@@ -535,6 +575,20 @@ function initAdmin() {
     coordinators: document.getElementById('tabCoordinators'),
     members:      document.getElementById('tabMembers')
   };
+
+  /* Lazy-load renderers: only render a tab when it is first shown */
+  const rendered = { news: false };
+  function ensureRendered(key) {
+    if (rendered[key]) return;
+    rendered[key] = true;
+    if (key === 'leadership')        loadLeadershipTab();
+    else if (key === 'patrons')      renderAdminPatrons();
+    else if (key === 'execos')       renderAdminExecos();
+    else if (key === 'bot')          renderAdminBOT();
+    else if (key === 'coordinators') renderAdminCoordinators();
+    else if (key === 'members')      renderAdminMembers();
+  }
+
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const key = tab.dataset.tab;
@@ -547,10 +601,10 @@ function initAdmin() {
         if (!el) return;
         el.hidden = k !== key;
       });
+      ensureRendered(key);
     });
   });
 
-  /* --- Sign-in (real form → Enter key works) --- */
   if (gateForm) {
     gateForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -576,7 +630,6 @@ function initAdmin() {
   if (deniedSignOut) deniedSignOut.addEventListener('click', () => signOut(auth));
   if (panelSignOut)  panelSignOut.addEventListener('click', () => signOut(auth));
 
-  /* --- Auth state --- */
   onAuthStateChanged(auth, async (user) => {
     gate.hidden = true;
     denied.hidden = true;
@@ -586,7 +639,6 @@ function initAdmin() {
       gatePassword.value = '';
       return;
     }
-
     let isAdmin = false;
     let checkFailed = false;
     try {
@@ -595,7 +647,6 @@ function initAdmin() {
       console.error(err);
       checkFailed = true;
     }
-
     if (checkFailed) {
       if (deniedTitle)   deniedTitle.textContent = 'Could Not Verify Access';
       if (deniedMessage) deniedMessage.textContent =
@@ -610,23 +661,17 @@ function initAdmin() {
       denied.hidden = false;
       return;
     }
-
     panel.hidden = false;
     if (panelEmail) panelEmail.textContent = user.email || '';
-    await Promise.all([
-      renderAdminNews(),
-      loadLeadershipTab(),
-      renderAdminPatrons(),
-      renderAdminExecos(),
-      renderAdminBOT(),
-      renderAdminCoordinators(),
-      renderAdminMembers()
-    ]);
+
+    /* Only the active (news) tab is rendered on sign-in */
+    if (!rendered.news) {
+      rendered.news = true;
+      renderAdminNews();
+    }
   });
 
-  /* =========================================================
-     NEWS TAB
-     ========================================================= */
+  /* =============== NEWS TAB =============== */
   const newsForm = document.getElementById('newsForm');
   const newsEditId = document.getElementById('newsEditId');
   const newsTitle = document.getElementById('newsTitle');
@@ -653,7 +698,6 @@ function initAdmin() {
     if (newsSuccess) newsSuccess.hidden = true;
     if (newsError) newsError.hidden = true;
   }
-
   if (newsClear) newsClear.addEventListener('click', resetNewsForm);
   if (newsCancel) newsCancel.addEventListener('click', resetNewsForm);
 
@@ -661,7 +705,6 @@ function initAdmin() {
     e.preventDefault();
     if (newsSuccess) newsSuccess.hidden = true;
     if (newsError) newsError.hidden = true;
-
     const payload = {
       title: newsTitle.value.trim(),
       date: newsDate.value,
@@ -677,7 +720,6 @@ function initAdmin() {
       showNewsError('Summary must be 220 characters or fewer.');
       return;
     }
-
     newsSubmit.disabled = true;
     try {
       const id = newsEditId.value;
@@ -764,9 +806,7 @@ function initAdmin() {
     });
   }
 
-  /* =========================================================
-     Shared person-card admin factory (Patrons, Excos, BOT)
-     ========================================================= */
+  /* =============== PERSON-CARD FACTORY (Patrons, Excos, BOT) =============== */
   function buildPersonAdmin(opts) {
     const {
       formId, editIdId, nameId, roleId, orderId,
@@ -859,21 +899,17 @@ function initAdmin() {
       e.preventDefault();
       if (successEl) successEl.hidden = true;
       if (errorEl) errorEl.hidden = true;
-
       const name  = nameEl ? nameEl.value.trim() : '';
       const role  = roleEl ? roleEl.value.trim() : '';
       const order = orderEl ? (Number(orderEl.value) || 0) : 0;
       if (!name || !role) { showError('Name and position are required.'); return; }
-
       const id = editIdEl ? editIdEl.value : '';
       const isEdit = Boolean(id);
-
       let uploaded = null;
       if (submitEl) submitEl.disabled = true;
       try {
         const file = photoEl && photoEl.files ? photoEl.files[0] : null;
         let photoUrl = null, photoPath = null, photoDeleteToken = null;
-
         if (file) {
           uploaded = await data.uploadToStorage(file);
           photoUrl = uploaded.url;
@@ -888,13 +924,12 @@ function initAdmin() {
           } else if (pasted) {
             try { new URL(pasted); }
             catch {
-              showError('Please enter a valid image URL (e.g. https://example.com/photo.jpg).');
+              showError('Please enter a valid image URL.');
               return;
             }
             photoUrl = pasted;
           }
         }
-
         try {
           const payload = { name, role, photoUrl, photoPath, photoDeleteToken, displayOrder: order };
           if (isEdit) await updateFn(id, payload);
@@ -902,17 +937,15 @@ function initAdmin() {
         } catch (writeErr) {
           if (uploaded && uploaded.path && uploaded.deleteToken) {
             try { await data.deleteStorageFile(uploaded.path, uploaded.deleteToken); }
-            catch (cleanupErr) { console.warn('Photo rollback failed:', cleanupErr); }
+            catch (e) { console.warn('Rollback failed:', e); }
           }
           throw writeErr;
         }
-
         if (isEdit && editing && editing.photoPath && editing.photoDeleteToken &&
             editing.photoPath !== photoPath) {
           try { await data.deleteStorageFile(editing.photoPath, editing.photoDeleteToken); }
-          catch (cleanupErr) { console.warn('Old photo cleanup failed:', cleanupErr); }
+          catch (e) { console.warn('Old photo cleanup failed:', e); }
         }
-
         reset();
         if (successEl) {
           successEl.textContent = isEdit ? 'Updated.' : 'Added.';
@@ -946,9 +979,8 @@ function initAdmin() {
     async function renderList() {
       if (!listEl) return;
       listEl.innerHTML = '<p class="empty-state">Loading…</p>';
-      try {
-        cache = await fetchFn();
-      } catch (err) {
+      try { cache = await fetchFn(); }
+      catch (err) {
         console.error(err);
         listEl.innerHTML = '<p class="empty-state">Could not load list.</p>';
         return;
@@ -961,8 +993,9 @@ function initAdmin() {
       listEl.innerHTML = cache.map((x, i) => {
         const isFirst = i === 0;
         const isLast = i === total - 1;
+        const thumbUrl = x.photoUrl ? data.cloudinaryUrl(x.photoUrl, { width: 88 }) : '';
         const thumb = x.photoUrl
-          ? `<img class="admin-thumb" src="${escapeHtml(x.photoUrl)}" alt="" loading="lazy">`
+          ? `<img class="admin-thumb" src="${escapeHtml(thumbUrl)}" alt="" width="44" height="44" loading="lazy">`
           : `<span class="admin-thumb admin-thumb-initials">${escapeHtml(getInitials(x.name))}</span>`;
         return `
           <div class="admin-list-row">
@@ -992,7 +1025,6 @@ function initAdmin() {
       listEl.querySelectorAll('[data-action="delete"]').forEach(b => b.addEventListener('click', async () => {
         if (!confirm('Delete this entry?')) return;
         try {
-          /* deleteFn (delete* in data-service) already removes the Cloudinary asset. */
           await deleteFn(b.dataset.id);
           if (editing && editing.id === b.dataset.id) reset();
           await renderList();
@@ -1006,9 +1038,7 @@ function initAdmin() {
     return { render: renderList };
   }
 
-  /* =========================================================
-     LEADERSHIP TAB (National Leader + Custodian)
-     ========================================================= */
+  /* =============== LEADERSHIP TAB =============== */
   const LEADERSHIP_SLOTS = [
     { key: 'national_leader', prefix: 'nl' },
     { key: 'custodian',       prefix: 'cust' }
@@ -1054,20 +1084,17 @@ function initAdmin() {
         e.preventDefault();
         if (successEl) successEl.hidden = true;
         if (errorEl) errorEl.hidden = true;
-
         const name = nameEl ? nameEl.value.trim() : '';
         const role = roleEl ? roleEl.value.trim() : '';
         if (!name) {
           if (errorEl) { errorEl.textContent = 'Name is required.'; errorEl.hidden = false; }
           return;
         }
-
         if (submitEl) submitEl.disabled = true;
         let uploaded = null;
         try {
           let current = null;
-          try { current = await data.fetchLeadership(slot.key); }
-          catch (fetchErr) { /* no doc yet — first save */ }
+          try { current = await data.fetchLeadership(slot.key); } catch { /* none yet */ }
 
           let photoUrl = current ? current.photoUrl : null;
           let photoPath = current ? current.photoPath : null;
@@ -1086,10 +1113,7 @@ function initAdmin() {
               if (pasted) {
                 try { new URL(pasted); }
                 catch {
-                  if (errorEl) {
-                    errorEl.textContent = 'Please enter a valid image URL.';
-                    errorEl.hidden = false;
-                  }
+                  if (errorEl) { errorEl.textContent = 'Please enter a valid image URL.'; errorEl.hidden = false; }
                   return;
                 }
                 photoUrl = pasted;
@@ -1104,31 +1128,23 @@ function initAdmin() {
           }
 
           try {
-            await data.updateLeadership(slot.key, {
-              name, role, photoUrl, photoPath, photoDeleteToken
-            });
+            await data.updateLeadership(slot.key, { name, role, photoUrl, photoPath, photoDeleteToken });
           } catch (writeErr) {
             if (uploaded && uploaded.path && uploaded.deleteToken) {
               try { await data.deleteStorageFile(uploaded.path, uploaded.deleteToken); }
-              catch (cleanupErr) { console.warn('Leadership upload rollback failed:', cleanupErr); }
+              catch (e) { console.warn('Leadership rollback failed:', e); }
             }
             throw writeErr;
           }
-
-          /* Clean up old Cloudinary photo if it was replaced or cleared. */
           if (current && current.photoPath && current.photoDeleteToken &&
               current.photoPath !== photoPath) {
             try { await data.deleteStorageFile(current.photoPath, current.photoDeleteToken); }
-            catch (cleanupErr) { console.warn('Old leadership photo cleanup failed:', cleanupErr); }
+            catch (e) { console.warn('Old leadership photo cleanup failed:', e); }
           }
-
           if (successEl) { successEl.textContent = 'Saved.'; successEl.hidden = false; }
         } catch (err) {
           console.error(err);
-          if (errorEl) {
-            errorEl.textContent = err.message || 'Could not save.';
-            errorEl.hidden = false;
-          }
+          if (errorEl) { errorEl.textContent = err.message || 'Could not save.'; errorEl.hidden = false; }
         } finally {
           if (submitEl) submitEl.disabled = false;
         }
@@ -1141,13 +1157,11 @@ function initAdmin() {
       try {
         const current = await data.fetchLeadership(slot.key);
         if (!current) continue;
-
         const nameEl      = document.getElementById(slot.prefix + 'Name');
         const roleEl      = document.getElementById(slot.prefix + 'Role');
         const photoUrlEl  = document.getElementById(slot.prefix + 'PhotoUrl');
         const previewWrap = document.getElementById(slot.prefix + 'PreviewWrap');
         const previewEl   = document.getElementById(slot.prefix + 'Preview');
-
         if (nameEl && current.name) nameEl.value = current.name;
         if (roleEl && current.role) roleEl.value = current.role;
         if (photoUrlEl && current.photoUrl) photoUrlEl.value = current.photoUrl;
@@ -1161,9 +1175,7 @@ function initAdmin() {
     }
   }
 
-  /* =========================================================
-     PATRONS TAB
-     ========================================================= */
+  /* =============== PATRONS TAB =============== */
   const patronAdmin = buildPersonAdmin({
     formId: 'patronForm', editIdId: 'patronEditId', nameId: 'patronName', roleId: 'patronRole',
     orderId: 'patronOrder', photoId: 'patronPhoto', photoUrlId: 'patronPhotoUrl',
@@ -1180,9 +1192,7 @@ function initAdmin() {
   });
   const renderAdminPatrons = patronAdmin.render;
 
-  /* =========================================================
-     EXECOS TAB
-     ========================================================= */
+  /* =============== EXECOS TAB =============== */
   const execoAdmin = buildPersonAdmin({
     formId: 'execoForm', editIdId: 'execoEditId', nameId: 'execoName', roleId: 'execoRole',
     orderId: 'execoOrder', photoId: 'execoPhoto', photoUrlId: 'execoPhotoUrl',
@@ -1199,9 +1209,7 @@ function initAdmin() {
   });
   const renderAdminExecos = execoAdmin.render;
 
-  /* =========================================================
-     BOARD OF TRUSTEES TAB
-     ========================================================= */
+  /* =============== BOT TAB =============== */
   const botAdmin = buildPersonAdmin({
     formId: 'botForm', editIdId: 'botEditId', nameId: 'botName', roleId: 'botRole',
     orderId: 'botOrder', photoId: 'botPhoto', photoUrlId: 'botPhotoUrl',
@@ -1218,9 +1226,7 @@ function initAdmin() {
   });
   const renderAdminBOT = botAdmin.render;
 
-  /* =========================================================
-     COORDINATORS TAB
-     ========================================================= */
+  /* =============== COORDINATORS TAB =============== */
   const coordForm = document.getElementById('coordForm');
   const coordName = document.getElementById('coordName');
   const coordState = document.getElementById('coordState');
@@ -1246,7 +1252,6 @@ function initAdmin() {
     e.preventDefault();
     if (coordSuccess) coordSuccess.hidden = true;
     if (coordError) coordError.hidden = true;
-
     const name = coordName.value.trim();
     const state = coordState.value;
     const lga = coordLga.value.trim();
@@ -1254,7 +1259,6 @@ function initAdmin() {
       showCoordError('Name, state, and LGA are all required.');
       return;
     }
-
     coordSubmit.disabled = true;
     try {
       await data.createCoordinator({ name, state, lga });
@@ -1347,9 +1351,7 @@ function initAdmin() {
     });
   }
 
-  /* =========================================================
-     MEMBERS TAB
-     ========================================================= */
+  /* =============== MEMBERS TAB =============== */
   const adminMembersList = document.getElementById('adminMembersList');
   const membersCount = document.getElementById('membersCount');
   const membersSearch = document.getElementById('membersSearch');
@@ -1367,17 +1369,16 @@ function initAdmin() {
       return;
     }
     adminMembersList.innerHTML = items.map(m => {
-      const createdDate = tsToDate(m.createdAt);
-      const createdStr = createdDate && !isNaN(createdDate.getTime())
-        ? createdDate.toLocaleDateString('en-GB')
-        : '';
+      const d = tsToDate(m.createdAt);
+      const createdStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-GB') : '';
+      const lgaStr = m.lga ? escapeHtml(m.lga) : '—';
       return `
         <div class="admin-list-row">
           <div class="admin-list-main">
             <div>
               <strong>${escapeHtml(m.fullName)}</strong>
               <span class="admin-list-sub">${escapeHtml(m.email)} · ${escapeHtml(m.phone)}</span>
-              <span class="admin-list-sub">${escapeHtml(m.state)} · <em>${escapeHtml(m.status)}</em>${createdStr ? ' · ' + escapeHtml(createdStr) : ''}</span>
+              <span class="admin-list-sub">${escapeHtml(m.state)} · ${lgaStr} · <em>${escapeHtml(m.status)}</em>${createdStr ? ' · ' + escapeHtml(createdStr) : ''}</span>
             </div>
           </div>
           <div class="admin-list-actions">
@@ -1434,7 +1435,8 @@ function initAdmin() {
       const filtered = membersCache.filter(m =>
         m.fullName.toLowerCase().includes(q) ||
         m.email.toLowerCase().includes(q) ||
-        m.state.toLowerCase().includes(q)
+        m.state.toLowerCase().includes(q) ||
+        (m.lga || '').toLowerCase().includes(q)
       );
       renderMembersRows(filtered);
     });
@@ -1445,11 +1447,11 @@ function initAdmin() {
       if (!membersView.length) { alert('No registrations to export.'); return; }
       downloadCSV(
         `tpa-members-${todayISO()}.csv`,
-        ['Full Name', 'Email', 'Phone', 'State', 'Status', 'Registered'],
+        ['Full Name', 'Email', 'Phone', 'State', 'LGA', 'Status', 'Registered'],
         membersView.map(m => {
           const d = tsToDate(m.createdAt);
           return [
-            m.fullName, m.email, m.phone, m.state, m.status,
+            m.fullName, m.email, m.phone, m.state, m.lga || '', m.status,
             d && !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : ''
           ];
         })
@@ -1457,13 +1459,13 @@ function initAdmin() {
     });
   }
 
-  /* Wire up the leadership tab (attaches listeners exactly once). */
   initLeadershipTab();
 }
 
 /* ---------------------------------------------------------
    Dispatch
    --------------------------------------------------------- */
+initImageLoader();
 
 if (page === 'home') {
   initNav(); initAnimations(); initMembershipForm(); renderHomeNews();

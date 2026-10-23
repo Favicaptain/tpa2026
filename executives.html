@@ -6,9 +6,11 @@
   <title>Leadership — Tinubu Progressive Advocates</title>
   <meta name="description" content="Meet the National Leader, Custodian, Patrons, Board of Trustees, National Executive Council and State Coordinators of Tinubu Progressive Advocates.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://res.cloudinary.com">
+  <link rel="icon" href="favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -17,7 +19,7 @@
   <header class="site-header">
     <div class="container nav-inner">
       <a href="index.html" class="brand">
-        <img src="logo.png" alt="TPA logo" class="brand-logo">
+        <img src="logo.png" alt="TPA logo" class="brand-logo" width="44" height="44">
         <div class="brand-text">
           <span class="brand-title">TINUBU PROGRESSIVE ADVOCATES</span>
           <span class="brand-sub">National Advocacy &amp; Grassroots Mobilisation</span>
@@ -43,7 +45,7 @@
     </div>
   </section>
 
-  <!-- Supreme Leadership — National Leader + Custodian -->
+  <!-- National Leader + Custodian -->
   <section class="section">
     <div class="container">
       <div class="section-head" style="text-align:center;margin-left:auto;margin-right:auto;">
@@ -51,21 +53,19 @@
         <h2>Our National Leader &amp; Custodian</h2>
       </div>
       <div class="leadership-grid">
-
         <article class="leadership-card">
           <div class="leadership-photo" id="nationalLeaderPhotoWrap">
-            <img id="nationalLeaderPhoto" alt="National Leader" loading="lazy" hidden>
+            <img id="nationalLeaderPhoto" alt="National Leader" loading="lazy" width="360" height="360" hidden>
             <div class="leadership-photo-fallback" id="nationalLeaderPhotoFallback">
               <i class="fa-solid fa-user-tie"></i>
             </div>
           </div>
-          <h3 id="nationalLeaderName">To Be Announced</h3>
+          <h3 id="nationalLeaderName">President Bola Ahmed Tinubu, GCFR</h3>
           <p class="leadership-role" id="nationalLeaderRole">National Leader</p>
         </article>
-
         <article class="leadership-card">
           <div class="leadership-photo" id="custodianPhotoWrap">
-            <img id="custodianPhoto" alt="Custodian" loading="lazy" hidden>
+            <img id="custodianPhoto" alt="Custodian" loading="lazy" width="360" height="360" hidden>
             <div class="leadership-photo-fallback" id="custodianPhotoFallback">
               <i class="fa-solid fa-shield-halved"></i>
             </div>
@@ -73,7 +73,6 @@
           <h3 id="custodianName">To Be Announced</h3>
           <p class="leadership-role" id="custodianRole">Custodian</p>
         </article>
-
       </div>
     </div>
   </section>
@@ -117,7 +116,7 @@
     </div>
   </section>
 
-  <!-- State Coordinators -->
+  <!-- State Coordinators (as table) -->
   <section class="section">
     <div class="container">
       <div class="section-head">
@@ -128,7 +127,18 @@
         <i class="fa-solid fa-magnifying-glass"></i>
         <input id="coordSearch" type="search" placeholder="Search by name, state or LGA…">
       </div>
-      <div class="coord-grid" id="coordGrid"></div>
+      <div class="coord-table-wrap" id="coordTableWrap" hidden>
+        <table class="coord-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">State</th>
+              <th scope="col">LGA</th>
+            </tr>
+          </thead>
+          <tbody id="coordTbody"></tbody>
+        </table>
+      </div>
       <p class="empty-state" id="coordEmpty" hidden>No coordinators found.</p>
     </div>
   </section>
@@ -144,7 +154,7 @@
     <div class="container">
       <div class="footer-top">
         <div class="footer-brand">
-          <img src="logo.png" alt="TPA logo" class="footer-logo">
+          <img src="logo.png" alt="TPA logo" class="footer-logo" width="40" height="40">
           <span class="footer-title">TINUBU PROGRESSIVE ADVOCATES</span>
         </div>
         <div class="footer-address">
